@@ -48,8 +48,9 @@ class TaskService {
 	@Transactional
 	TaskResponse create(UUID projectId, CreateTaskRequest request) {
 		requireProject(projectId);
-		Task task = new Task(projectId, request.title().strip(), normalize(request.description()));
-		return TaskResponse.from(tasks.save(task));
+		TaskContent content = new TaskContent(projectId, request.title().strip(), normalize(request.description()),
+				request.dueDate(), request.dueTime(), priorityOrDefault(request.priority()));
+		return TaskResponse.from(tasks.save(new Task(content)));
 	}
 
 	@Transactional
@@ -58,7 +59,8 @@ class TaskService {
 		if (!task.getProjectId().equals(request.projectId())) {
 			requireProject(request.projectId());
 		}
-		task.update(request.projectId(), request.title().strip(), normalize(request.description()));
+		task.update(new TaskContent(request.projectId(), request.title().strip(), normalize(request.description()),
+				request.dueDate(), request.dueTime(), priorityOrDefault(request.priority())));
 		return TaskResponse.from(task);
 	}
 
@@ -89,6 +91,10 @@ class TaskService {
 		if (!projects.exists(projectId)) {
 			throw new ProjectNotFoundException(projectId);
 		}
+	}
+
+	private static int priorityOrDefault(Integer priority) {
+		return (priority != null) ? priority : TaskContent.DEFAULT_PRIORITY;
 	}
 
 	private static String normalize(String description) {

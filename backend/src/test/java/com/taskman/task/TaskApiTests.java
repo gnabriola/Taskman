@@ -55,6 +55,63 @@ class TaskApiTests {
 	}
 
 	@Test
+	void storesDueDateTimeAndPriority() {
+		assertThat(mvc.post()
+			.uri("/api/projects/{projectId}/tasks", projectId)
+			.contentType(MediaType.APPLICATION_JSON)
+			.content("""
+					{"title": "Pay rent", "dueDate": "2026-10-08", "dueTime": "17:00", "priority": 1}
+					""")).hasStatus(HttpStatus.CREATED)
+			.bodyJson()
+			.isLenientlyEqualTo("""
+					{"dueDate": "2026-10-08", "dueTime": "17:00:00", "priority": 1}
+					""");
+	}
+
+	@Test
+	void rejectsDueTimeWithoutDueDate() {
+		assertThat(mvc.post()
+			.uri("/api/projects/{projectId}/tasks", projectId)
+			.contentType(MediaType.APPLICATION_JSON)
+			.content("""
+					{"title": "Pay rent", "dueTime": "17:00"}
+					""")).hasStatus(HttpStatus.BAD_REQUEST)
+			.bodyJson()
+			.extractingPath("$.errors[0].field")
+			.isEqualTo("dueTime");
+	}
+
+	@Test
+	void rejectsPriorityOutOfRange() {
+		assertThat(mvc.post()
+			.uri("/api/projects/{projectId}/tasks", projectId)
+			.contentType(MediaType.APPLICATION_JSON)
+			.content("""
+					{"title": "Pay rent", "priority": 5}
+					""")).hasStatus(HttpStatus.BAD_REQUEST);
+	}
+
+	@Test
+	void updateReplacesDueDateAndPriority() throws Exception {
+		MvcTestResult created = mvc.post()
+			.uri("/api/projects/{projectId}/tasks", projectId)
+			.contentType(MediaType.APPLICATION_JSON)
+			.content("""
+					{"title": "Pay rent", "dueDate": "2026-10-08", "priority": 1}
+					""")
+			.exchange();
+		String id = idOf(created);
+
+		assertThat(mvc.put().uri("/api/tasks/{id}", id).contentType(MediaType.APPLICATION_JSON).content("""
+				{"title": "Pay rent", "projectId": "%s"}
+				""".formatted(projectId))).hasStatusOk()
+			.bodyJson()
+			.isLenientlyEqualTo("""
+					{"dueDate": null, "dueTime": null, "priority": 4}
+					""");
+	}
+
+	@Test
 	void creatingTaskInMissingProjectReturnsNotFound() {
 		assertThat(mvc.post()
 			.uri("/api/projects/{projectId}/tasks", MISSING_ID)

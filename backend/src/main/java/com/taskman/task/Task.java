@@ -1,6 +1,8 @@
 package com.taskman.task;
 
 import java.time.Instant;
+import java.time.LocalDate;
+import java.time.LocalTime;
 import java.time.temporal.ChronoUnit;
 import java.util.UUID;
 
@@ -27,6 +29,13 @@ class Task {
 
 	private String description;
 
+	private LocalDate dueDate;
+
+	private LocalTime dueTime;
+
+	@Column(nullable = false)
+	private int priority;
+
 	private Instant completedAt;
 
 	@Column(nullable = false, updatable = false)
@@ -39,19 +48,24 @@ class Task {
 		// for JPA
 	}
 
-	Task(UUID projectId, String title, String description) {
-		this.projectId = projectId;
-		this.title = title;
-		this.description = description;
+	Task(TaskContent content) {
+		apply(content);
 		this.createdAt = now();
 		this.updatedAt = this.createdAt;
 	}
 
-	void update(UUID projectId, String title, String description) {
-		this.projectId = projectId;
-		this.title = title;
-		this.description = description;
+	void update(TaskContent content) {
+		apply(content);
 		this.updatedAt = now();
+	}
+
+	private void apply(TaskContent content) {
+		this.projectId = content.projectId();
+		this.title = content.title();
+		this.description = content.description();
+		this.dueDate = content.dueDate();
+		this.dueTime = content.dueTime();
+		this.priority = content.priority();
 	}
 
 	/** Completing an already completed task keeps the original completion time. */
@@ -83,6 +97,18 @@ class Task {
 
 	String getDescription() {
 		return description;
+	}
+
+	LocalDate getDueDate() {
+		return dueDate;
+	}
+
+	LocalTime getDueTime() {
+		return dueTime;
+	}
+
+	int getPriority() {
+		return priority;
 	}
 
 	Instant getCompletedAt() {
