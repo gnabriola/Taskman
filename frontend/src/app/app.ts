@@ -1,12 +1,16 @@
-import { Component, signal } from '@angular/core';
+import { Component, inject } from '@angular/core';
 import { RouterOutlet } from '@angular/router';
+
+import { ProjectSidebar } from './project/project-sidebar';
+import { ProjectStore } from './project/project.store';
 
 @Component({
   selector: 'app-root',
-  imports: [RouterOutlet],
+  imports: [RouterOutlet, ProjectSidebar],
   templateUrl: './app.html',
-  styleUrl: './app.css'
 })
 export class App {
-  protected readonly title = signal('frontend');
+  constructor() {
+    inject(ProjectStore).load();
+  }
 }

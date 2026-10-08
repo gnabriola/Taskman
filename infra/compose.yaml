@@ -1,0 +1,14 @@
+services:
+  postgres:
+    image: 'postgres:18'
+    environment:
+      - 'POSTGRES_DB=taskman'
+      - 'POSTGRES_USER=taskman'
+      - 'POSTGRES_PASSWORD=taskman'
+    ports:
+      - '5433:5432'  # 5433 on the host: avoids clashing with a locally installed PostgreSQL
+    volumes:
+      - 'postgres-data:/var/lib/postgresql'
+
+volumes:
+  postgres-data:
