@@ -25,12 +25,16 @@ describe('TaskApi', () => {
     expect(req.request.method).toBe('GET');
   });
 
-  it('creates a task in a project', () => {
-    api.create('p1', 'Pay rent').subscribe();
+  it('sends quick-add text with the default project and time zone', () => {
+    api.quickAdd('pay rent tomorrow', 'p1', 'Europe/Berlin').subscribe();
 
-    const req = http.expectOne('/api/projects/p1/tasks');
+    const req = http.expectOne('/api/tasks/quick-add');
     expect(req.request.method).toBe('POST');
-    expect(req.request.body).toEqual({ title: 'Pay rent' });
+    expect(req.request.body).toEqual({
+      text: 'pay rent tomorrow',
+      defaultProjectId: 'p1',
+      timeZone: 'Europe/Berlin',
+    });
   });
 
   it('completes a task', () => {

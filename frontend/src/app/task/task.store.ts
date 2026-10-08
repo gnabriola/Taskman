@@ -1,5 +1,8 @@
 import { Injectable, inject, signal } from '@angular/core';
+import { EMPTY, Observable, tap } from 'rxjs';
 
+import { problemDetail } from '../core/problem-detail';
+import { TIME_ZONE } from '../core/time-zone';
 import { TaskApi } from './task.api';
 import { Task } from './task.model';
 
@@ -7,22 +10,27 @@ import { Task } from './task.model';
 @Injectable()
 export class TaskStore {
   private readonly api = inject(TaskApi);
+  private readonly timeZone = inject(TIME_ZONE);
 
   private projectId: string | null = null;
 
   private readonly _tasks = signal<Task[]>([]);
   private readonly _loading = signal(false);
   private readonly _error = signal<string | null>(null);
+  private readonly _addedToOtherProject = signal<string | null>(null);
 
   readonly tasks = this._tasks.asReadonly();
   readonly loading = this._loading.asReadonly();
   readonly error = this._error.asReadonly();
+  /** Id of the project the last quick-added task went to, if it is not this one. */
+  readonly addedToOtherProject = this._addedToOtherProject.asReadonly();
 
   load(projectId: string): void {
     this.projectId = projectId;
     this._tasks.set([]);
     this._loading.set(true);
     this._error.set(null);
+    this._addedToOtherProject.set(null);
     this.api.listOpen(projectId).subscribe({
       next: (tasks) => {
         // Ignore a slow response for a project the user has already navigated away from.
@@ -40,19 +48,32 @@ export class TaskStore {
     });
   }
 
-  add(title: string): void {
+  /**
+   * Creates a task from quick-add text. Returns the request so the caller can react
+   * to success (e.g. clear the input) without the store knowing about the form.
+   */
+  quickAdd(text: string): Observable<Task> {
     const projectId = this.projectId;
     if (!projectId) {
-      return;
+      return EMPTY;
     }
-    this.api.create(projectId, title).subscribe({
-      next: (task) => {
-        if (this.projectId === projectId) {
-          this._tasks.update((tasks) => [...tasks, task]);
-        }
-      },
-      error: () => this._error.set('Could not add the task.'),
-    });
+    return this.api.quickAdd(text, projectId, this.timeZone).pipe(
+      tap({
+        next: (task) => {
+          this._error.set(null);
+          if (task.projectId === this.projectId) {
+            this._tasks.update((tasks) => [...tasks, task]);
+            this._addedToOtherProject.set(null);
+          } else {
+            this._addedToOtherProject.set(task.projectId);
+          }
+        },
+        error: (error: unknown) => {
+          this._error.set(problemDetail(error, 'Could not add the task.'));
+          this._addedToOtherProject.set(null);
+        },
+      }),
+    );
   }
 
   /** Optimistic: the task disappears at once and comes back if the server call fails. */
