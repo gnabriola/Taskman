@@ -1,0 +1,32 @@
+<nav class="flex flex-col gap-4 p-4" aria-label="Projects">
+  <h2 class="px-2 text-xs font-semibold tracking-wide text-gray-500 uppercase">Projects</h2>
+
+  <ul class="flex flex-col gap-0.5">
+    @for (project of store.projects(); track project.id) {
+      <li>
+        <a
+          [routerLink]="['/projects', project.id]"
+          routerLinkActive="bg-gray-200 font-medium"
+          class="block truncate rounded px-2 py-1.5 text-sm hover:bg-gray-100"
+        >
+          {{ project.name }}
+        </a>
+      </li>
+    }
+  </ul>
+
+  <form (submit)="addProject($event, nameInput)">
+    <input
+      #nameInput
+      type="text"
+      maxlength="120"
+      placeholder="+ New project"
+      aria-label="New project name"
+      class="w-full rounded border border-transparent bg-transparent px-2 py-1.5 text-sm placeholder:text-gray-500 focus:border-gray-300 focus:bg-white focus:outline-none"
+    />
+  </form>
+
+  @if (store.error(); as error) {
+    <p role="alert" class="px-2 text-sm text-red-600">{{ error }}</p>
+  }
+</nav>
