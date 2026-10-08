@@ -1,10 +1,15 @@
 package com.taskman.task;
 
+import java.time.Clock;
+import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.List;
 import java.util.UUID;
 
 import com.taskman.project.ProjectApi;
 import com.taskman.project.ProjectNotFoundException;
+import com.taskman.task.quickadd.ParsedTask;
+import com.taskman.task.quickadd.QuickAddParser;
 
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -17,9 +22,14 @@ class TaskService {
 
 	private final ProjectApi projects;
 
-	TaskService(TaskRepository tasks, ProjectApi projects) {
+	private final Clock clock;
+
+	private final QuickAddParser parser = new QuickAddParser();
+
+	TaskService(TaskRepository tasks, ProjectApi projects, Clock clock) {
 		this.tasks = tasks;
 		this.projects = projects;
+		this.clock = clock;
 	}
 
 	/**
@@ -50,6 +60,27 @@ class TaskService {
 		requireProject(projectId);
 		TaskContent content = new TaskContent(projectId, request.title().strip(), normalize(request.description()),
 				request.dueDate(), request.dueTime(), priorityOrDefault(request.priority()));
+		return TaskResponse.from(tasks.save(new Task(content)));
+	}
+
+	@Transactional
+	TaskResponse quickAdd(QuickAddRequest request) {
+		LocalDateTime now = LocalDateTime.now(clock.withZone(ZoneId.of(request.timeZone())));
+		ParsedTask parsed = parser.parse(request.text(), now);
+		if (parsed.title().isBlank()) {
+			throw QuickAddRejectedException.emptyTitle();
+		}
+		UUID projectId;
+		if (parsed.projectName() != null) {
+			projectId = projects.findIdByName(parsed.projectName())
+				.orElseThrow(() -> QuickAddRejectedException.unknownProject(parsed.projectName()));
+		}
+		else {
+			projectId = request.defaultProjectId();
+			requireProject(projectId);
+		}
+		TaskContent content = new TaskContent(projectId, parsed.title(), null, parsed.dueDate(), parsed.dueTime(),
+				priorityOrDefault(parsed.priority()));
 		return TaskResponse.from(tasks.save(new Task(content)));
 	}
 

@@ -1,5 +1,6 @@
 package com.taskman.project;
 
+import java.util.Optional;
 import java.util.UUID;
 
 /**
@@ -9,5 +10,11 @@ import java.util.UUID;
 public interface ProjectApi {
 
 	boolean exists(UUID projectId);
+
+	/**
+	 * Finds a project by name, ignoring case. Names are not unique; if several
+	 * projects share a name, the oldest one wins.
+	 */
+	Optional<UUID> findIdByName(String name);
 
 }

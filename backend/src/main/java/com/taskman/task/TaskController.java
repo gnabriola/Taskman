@@ -37,11 +37,13 @@ class TaskController {
 	@PostMapping("/projects/{projectId}/tasks")
 	ResponseEntity<TaskResponse> create(@PathVariable UUID projectId, @Valid @RequestBody CreateTaskRequest request) {
 		TaskResponse created = taskService.create(projectId, request);
-		URI location = ServletUriComponentsBuilder.fromCurrentContextPath()
-			.path("/api/tasks/{id}")
-			.buildAndExpand(created.id())
-			.toUri();
-		return ResponseEntity.created(location).body(created);
+		return ResponseEntity.created(taskLocation(created)).body(created);
+	}
+
+	@PostMapping("/tasks/quick-add")
+	ResponseEntity<TaskResponse> quickAdd(@Valid @RequestBody QuickAddRequest request) {
+		TaskResponse created = taskService.quickAdd(request);
+		return ResponseEntity.created(taskLocation(created)).body(created);
 	}
 
 	@GetMapping("/tasks/{id}")
@@ -68,6 +70,13 @@ class TaskController {
 	ResponseEntity<Void> delete(@PathVariable UUID id) {
 		taskService.delete(id);
 		return ResponseEntity.noContent().build();
+	}
+
+	private static URI taskLocation(TaskResponse task) {
+		return ServletUriComponentsBuilder.fromCurrentContextPath()
+			.path("/api/tasks/{id}")
+			.buildAndExpand(task.id())
+			.toUri();
 	}
 
 }
