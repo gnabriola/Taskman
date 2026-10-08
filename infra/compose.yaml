@@ -1,0 +1,14 @@
+services:
+  postgres:
+    image: 'postgres:18'
+    environment:
+      - 'POSTGRES_DB=taskman'
+      - 'POSTGRES_USER=taskman'
+      - 'POSTGRES_PASSWORD=taskman'
+    ports:
+      - '5432:5432'
+    volumes:
+      - 'postgres-data:/var/lib/postgresql'
+
+volumes:
+  postgres-data:
