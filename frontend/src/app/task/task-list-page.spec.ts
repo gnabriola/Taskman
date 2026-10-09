@@ -83,4 +83,30 @@ describe('TaskListPage', () => {
 
     expect(http.expectOne('/api/tasks/t1/complete').request.method).toBe('POST');
   });
+
+  it('shows the recurrence and unticks a recurring task after completing it', async () => {
+    const fixture = TestBed.createComponent(TaskListPage);
+    fixture.componentRef.setInput('projectId', 'p1');
+    await fixture.whenStable();
+    const recurring = aTask({
+      id: 't1',
+      title: 'Gym',
+      dueDate: '2030-01-07',
+      recurrence: 'FREQ=WEEKLY;BYDAY=MO,FR',
+      recurrenceLabel: 'every Mon, Fri',
+    });
+    http.expectOne('/api/projects/p1/tasks?completed=false').flush([recurring]);
+    await fixture.whenStable();
+    const page = fixture.nativeElement as HTMLElement;
+    expect(page.querySelector('ul')?.textContent).toContain('every Mon, Fri');
+
+    const checkbox = page.querySelector<HTMLInputElement>('input[aria-label="Complete Gym"]')!;
+    checkbox.click();
+    expect(checkbox.checked).toBe(true);
+    http.expectOne('/api/tasks/t1/complete').flush({ ...recurring, dueDate: '2030-01-11' });
+    await fixture.whenStable();
+
+    expect(page.querySelector('ul')?.textContent).toContain('Gym');
+    expect(checkbox.checked).toBe(false);
+  });
 });

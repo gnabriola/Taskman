@@ -37,9 +37,11 @@ describe('TaskApi', () => {
     });
   });
 
-  it('completes a task', () => {
-    api.complete('t1').subscribe();
+  it('completes a task, sending the time zone for recurring tasks', () => {
+    api.complete('t1', 'Europe/Berlin').subscribe();
 
-    expect(http.expectOne('/api/tasks/t1/complete').request.method).toBe('POST');
+    const req = http.expectOne('/api/tasks/t1/complete');
+    expect(req.request.method).toBe('POST');
+    expect(req.request.body).toEqual({ timeZone: 'Europe/Berlin' });
   });
 });

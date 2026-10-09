@@ -76,15 +76,29 @@ export class TaskStore {
     );
   }
 
-  /** Optimistic: the task disappears at once and comes back if the server call fails. */
-  complete(task: Task): void {
+  /**
+   * A one-off task disappears at once (optimistic) and comes back if the server call
+   * fails. A recurring task stays and is replaced by the server's answer, which carries
+   * its next due date; that date is computed on the server, so there is nothing to
+   * show optimistically.
+   */
+  complete(task: Task): Observable<Task> {
     const previous = this._tasks();
-    this._tasks.set(previous.filter((t) => t.id !== task.id));
-    this.api.complete(task.id).subscribe({
-      error: () => {
-        this._tasks.set(previous);
-        this._error.set(`Could not complete "${task.title}".`);
-      },
-    });
+    if (!task.recurrence) {
+      this._tasks.set(previous.filter((t) => t.id !== task.id));
+    }
+    return this.api.complete(task.id, this.timeZone).pipe(
+      tap({
+        next: (updated) => {
+          if (updated.recurrence) {
+            this._tasks.update((tasks) => tasks.map((t) => (t.id === updated.id ? updated : t)));
+          }
+        },
+        error: () => {
+          this._tasks.set(previous);
+          this._error.set(`Could not complete "${task.title}".`);
+        },
+      }),
+    );
   }
 }

@@ -1,8 +1,10 @@
 package com.taskman.task;
 
 import java.time.Clock;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
+import java.time.ZoneOffset;
 import java.util.List;
 import java.util.UUID;
 
@@ -59,7 +61,7 @@ class TaskService {
 	TaskResponse create(UUID projectId, CreateTaskRequest request) {
 		requireProject(projectId);
 		TaskContent content = new TaskContent(projectId, request.title().strip(), normalize(request.description()),
-				request.dueDate(), request.dueTime(), priorityOrDefault(request.priority()));
+				request.dueDate(), request.dueTime(), priorityOrDefault(request.priority()), request.toRecurrence());
 		return TaskResponse.from(tasks.save(new Task(content)));
 	}
 
@@ -80,7 +82,7 @@ class TaskService {
 			requireProject(projectId);
 		}
 		TaskContent content = new TaskContent(projectId, parsed.title(), null, parsed.dueDate(), parsed.dueTime(),
-				priorityOrDefault(parsed.priority()));
+				priorityOrDefault(parsed.priority()), parsed.recurrence());
 		return TaskResponse.from(tasks.save(new Task(content)));
 	}
 
@@ -91,14 +93,15 @@ class TaskService {
 			requireProject(request.projectId());
 		}
 		task.update(new TaskContent(request.projectId(), request.title().strip(), normalize(request.description()),
-				request.dueDate(), request.dueTime(), priorityOrDefault(request.priority())));
+				request.dueDate(), request.dueTime(), priorityOrDefault(request.priority()), request.toRecurrence()));
 		return TaskResponse.from(task);
 	}
 
 	@Transactional
-	TaskResponse complete(UUID id) {
+	TaskResponse complete(UUID id, String timeZone) {
 		Task task = load(id);
-		task.complete();
+		ZoneId zone = (timeZone != null) ? ZoneId.of(timeZone) : ZoneOffset.UTC;
+		task.complete(LocalDate.now(clock.withZone(zone)));
 		return TaskResponse.from(task);
 	}
 

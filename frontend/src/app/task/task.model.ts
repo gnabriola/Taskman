@@ -11,6 +11,12 @@ export interface Task {
   /** ISO time (HH:mm:ss); only set together with dueDate. */
   dueTime: string | null;
   priority: Priority;
+  /** RRULE subset, e.g. "FREQ=WEEKLY;BYDAY=MO"; null for a one-off task. */
+  recurrence: string | null;
+  /** Todoist's "every!": the next occurrence counts from the completion date. */
+  recurrenceFromCompletion: boolean;
+  /** Readable form of the recurrence, e.g. "every Monday". */
+  recurrenceLabel: string | null;
   completed: boolean;
   completedAt: string | null;
   createdAt: string;

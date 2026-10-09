@@ -9,12 +9,17 @@ import java.time.Month;
 import java.time.format.DateTimeParseException;
 import java.time.temporal.TemporalAdjusters;
 import java.util.ArrayList;
+import java.util.EnumSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+
+import com.taskman.task.recurrence.Frequency;
+import com.taskman.task.recurrence.Recurrence;
 
 /**
  * Parses Todoist-style quick-add text such as {@code "pay rent tomorrow 5pm #home p1"}.
@@ -22,7 +27,9 @@ import java.util.regex.Pattern;
  * The text is split into words. Walking left to right, small rules try to match a
  * date, a time, a {@code #project} or a priority starting at the current word. Only
  * the first date and the first time are used; every word no rule consumed becomes
- * the title. The behaviour is specified by {@code QuickAddParserTest}.
+ * the title. A recurrence ("every monday", "every! 3 days") gives the first due date
+ * unless the text also names a date. The behaviour is specified by
+ * {@code QuickAddParserTest}.
  */
 public class QuickAddParser {
 
@@ -37,6 +44,8 @@ public class QuickAddParser {
 	private static final Pattern TIME_24H = Pattern.compile("(\\d{1,2}):(\\d{2})");
 
 	private static final Pattern NUMBER = Pattern.compile("\\d{1,3}");
+
+	private static final Pattern ORDINAL = Pattern.compile("(\\d{1,2})(st|nd|rd|th)");
 
 	private static final Map<String, DayOfWeek> WEEKDAYS = Map.ofEntries(Map.entry("monday", DayOfWeek.MONDAY),
 			Map.entry("mon", DayOfWeek.MONDAY), Map.entry("tuesday", DayOfWeek.TUESDAY),
@@ -90,6 +99,7 @@ public class QuickAddParser {
 		LocalTime dueTime = null;
 		String projectName = null;
 		Integer priority = null;
+		Recurrence recurrence = null;
 
 		for (int i = 0; i < words.size(); i++) {
 			if (consumed[i] || words.get(i).isEmpty()) {
@@ -100,6 +110,14 @@ public class QuickAddParser {
 				projectName = project.group(1);
 				consumed[i] = true;
 				continue;
+			}
+			if (recurrence == null) {
+				Optional<Match<Recurrence>> repeat = recurrence(words, i, today);
+				if (repeat.isPresent()) {
+					recurrence = repeat.get().value();
+					consume(consumed, words, i, repeat.get().length(), "");
+					continue;
+				}
 			}
 			Matcher prio = PRIORITY.matcher(words.get(i));
 			if (priority == null && prio.matches()) {
@@ -124,6 +142,13 @@ public class QuickAddParser {
 			}
 		}
 
+		if (recurrence != null && dueDate == null) {
+			dueDate = recurrence.firstOnOrAfter(today);
+			if (dueDate.equals(today) && dueTime != null && !dueTime.isAfter(now.toLocalTime())) {
+				// Today's occurrence is already past: start with the next one.
+				dueDate = recurrence.nextAfter(today);
+			}
+		}
 		if (dueTime != null && dueDate == null) {
 			// A time on its own means its next occurrence: today if still ahead, else tomorrow.
 			dueDate = dueTime.isAfter(now.toLocalTime()) ? today : today.plusDays(1);
@@ -135,7 +160,7 @@ public class QuickAddParser {
 				titleWords.add(original[i]);
 			}
 		}
-		return new ParsedTask(String.join(" ", titleWords), dueDate, dueTime, projectName, priority);
+		return new ParsedTask(String.join(" ", titleWords), dueDate, dueTime, projectName, priority, recurrence);
 	}
 
 	private static <T> Optional<Match<T>> firstMatch(List<Rule<T>> rules, List<String> words, int start,
@@ -157,6 +182,143 @@ public class QuickAddParser {
 		if (start > 0 && !consumed[start - 1] && words.get(start - 1).equals(filler)) {
 			consumed[start - 1] = true;
 		}
+	}
+
+	// ---- Recurrence rule ----
+
+	/**
+	 * "every day", "every 3 weeks", "every other friday", "every mon, wed and fri",
+	 * "every weekday", "every 15th", "every oct 31", and the same with "every!".
+	 * Plain "every week/month/year" keeps today's weekday or date as its anchor;
+	 * "every!" has no anchor because it counts from the completion date.
+	 */
+	private static Optional<Match<Recurrence>> recurrence(List<String> words, int start, LocalDate today) {
+		String keyword = words.get(start);
+		if (!keyword.equals("every") && !keyword.equals("every!")) {
+			return Optional.empty();
+		}
+		boolean fromCompletion = keyword.equals("every!");
+		// A date of the year first, so the 7 in "every 7 october" is not read as an interval.
+		if (start + 2 < words.size()) {
+			String first = words.get(start + 1);
+			String second = words.get(start + 2);
+			Optional<Recurrence> yearly = yearlyOn(first, second, fromCompletion)
+				.or(() -> yearlyOn(second, first, fromCompletion));
+			if (yearly.isPresent()) {
+				return Optional.of(new Match<>(yearly.get(), 3));
+			}
+		}
+		int next = start + 1;
+		int interval = 1;
+		if (next < words.size() && words.get(next).equals("other")) {
+			interval = 2;
+			next++;
+		}
+		else if (next < words.size() && NUMBER.matcher(words.get(next)).matches()) {
+			interval = Integer.parseInt(words.get(next));
+			if (interval < 1) {
+				return Optional.empty();
+			}
+			next++;
+		}
+		if (next >= words.size()) {
+			return Optional.empty();
+		}
+		String word = words.get(next);
+		int length = next + 1 - start;
+
+		Frequency unit = switch (word) {
+			case "day", "days" -> Frequency.DAILY;
+			case "week", "weeks" -> Frequency.WEEKLY;
+			case "month", "months" -> Frequency.MONTHLY;
+			case "year", "years" -> Frequency.YEARLY;
+			default -> null;
+		};
+		if (unit != null) {
+			return Optional.of(new Match<>(unitRecurrence(unit, interval, today, fromCompletion), length));
+		}
+		if (interval == 1 && (word.equals("weekday") || word.equals("weekend"))) {
+			Set<DayOfWeek> days = word.equals("weekday") ? EnumSet.range(DayOfWeek.MONDAY, DayOfWeek.FRIDAY)
+					: EnumSet.of(DayOfWeek.SATURDAY, DayOfWeek.SUNDAY);
+			return Optional.of(new Match<>(new Recurrence(Frequency.WEEKLY, 1, days, null, null, fromCompletion),
+					length));
+		}
+		Optional<Match<Set<DayOfWeek>>> days = weekdayList(words, next);
+		if (days.isPresent() && interval <= 2) {
+			Recurrence weekly = new Recurrence(Frequency.WEEKLY, interval, days.get().value(), null, null,
+					fromCompletion);
+			return Optional.of(new Match<>(weekly, next - start + days.get().length()));
+		}
+		if (interval != 1) {
+			return Optional.empty();
+		}
+		Matcher ordinal = ORDINAL.matcher(word);
+		if (ordinal.matches()) {
+			int day = Integer.parseInt(ordinal.group(1));
+			if (day < 1 || day > 31) {
+				return Optional.empty();
+			}
+			return Optional.of(new Match<>(new Recurrence(Frequency.MONTHLY, 1, null, day, null, fromCompletion),
+					length));
+		}
+		return Optional.empty();
+	}
+
+	private static Recurrence unitRecurrence(Frequency unit, int interval, LocalDate today, boolean fromCompletion) {
+		if (fromCompletion) {
+			return new Recurrence(unit, interval, null, null, null, true);
+		}
+		return switch (unit) {
+			case DAILY -> new Recurrence(unit, interval, null, null, null, false);
+			case WEEKLY -> new Recurrence(unit, interval, Set.of(today.getDayOfWeek()), null, null, false);
+			case MONTHLY -> new Recurrence(unit, interval, null, today.getDayOfMonth(), null, false);
+			case YEARLY -> new Recurrence(unit, interval, null, today.getDayOfMonth(), today.getMonth(), false);
+		};
+	}
+
+	/** "mon", "mon, wed, fri", "mon,fri", "tue and thu". */
+	private static Optional<Match<Set<DayOfWeek>>> weekdayList(List<String> words, int start) {
+		Set<DayOfWeek> days = EnumSet.noneOf(DayOfWeek.class);
+		int consumed = 0;
+		for (int i = start; i < words.size(); i++) {
+			String word = words.get(i);
+			if (word.equals("and") && !days.isEmpty() && i + 1 < words.size()
+					&& WEEKDAYS.containsKey(stripComma(words.get(i + 1)))) {
+				continue;
+			}
+			Set<DayOfWeek> found = EnumSet.noneOf(DayOfWeek.class);
+			for (String part : stripComma(word).split(",")) {
+				DayOfWeek day = WEEKDAYS.get(part);
+				if (day == null) {
+					found = null;
+					break;
+				}
+				found.add(day);
+			}
+			if (found == null) {
+				break;
+			}
+			days.addAll(found);
+			consumed = i - start + 1;
+		}
+		return days.isEmpty() ? Optional.empty() : Optional.of(new Match<>(days, consumed));
+	}
+
+	private static String stripComma(String word) {
+		return word.endsWith(",") ? word.substring(0, word.length() - 1) : word;
+	}
+
+	/** A yearly rule from a month and a day such as "oct" and "31"; Feb 29 is allowed. */
+	private static Optional<Recurrence> yearlyOn(String monthWord, String dayWord, boolean fromCompletion) {
+		Month month = MONTHS.get(monthWord);
+		if (month == null || !NUMBER.matcher(dayWord).matches()) {
+			return Optional.empty();
+		}
+		int day = Integer.parseInt(dayWord);
+		if (day < 1 || day > month.maxLength()) {
+			return Optional.empty();
+		}
+		return Optional.of(new Recurrence(Frequency.YEARLY, 1, null, day, month, fromCompletion));
 	}
 
 	// ---- Date rules ----

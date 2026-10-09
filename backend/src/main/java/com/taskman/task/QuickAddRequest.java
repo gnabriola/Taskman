@@ -1,10 +1,8 @@
 package com.taskman.task;
 
-import java.time.DateTimeException;
-import java.time.ZoneId;
 import java.util.UUID;
 
-import jakarta.validation.constraints.AssertTrue;
+import com.taskman.shared.validation.IanaTimeZone;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
@@ -16,20 +14,5 @@ import jakarta.validation.constraints.Size;
  * "today" and "5pm" mean
  */
 record QuickAddRequest(@NotBlank @Size(max = 500) String text, @NotNull UUID defaultProjectId,
-		@NotBlank String timeZone) {
-
-	@AssertTrue(message = "must be a valid IANA time zone, e.g. Europe/Berlin")
-	boolean isTimeZone() {
-		if (timeZone == null || timeZone.isBlank()) {
-			return true; // reported by @NotBlank
-		}
-		try {
-			ZoneId.of(timeZone);
-			return true;
-		}
-		catch (DateTimeException ex) {
-			return false;
-		}
-	}
-
+		@NotBlank @IanaTimeZone String timeZone) {
 }

@@ -48,6 +48,16 @@ class QuickAddApiTests {
 	}
 
 	@Test
+	void createsRecurringTask() {
+		assertThat(quickAdd("pay rent every 1st p1", "UTC")).hasStatus(HttpStatus.CREATED)
+			.bodyJson()
+			.isLenientlyEqualTo("""
+					{"title": "pay rent", "recurrence": "FREQ=MONTHLY;BYMONTHDAY=1", "recurrenceFromCompletion": false,
+					 "recurrenceLabel": "every 1st", "priority": 1}
+					""");
+	}
+
+	@Test
 	void putsTaskIntoNamedProject() throws Exception {
 		String workId = createProject("Work");
 

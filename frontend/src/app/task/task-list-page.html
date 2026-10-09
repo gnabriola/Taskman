@@ -17,9 +17,10 @@
       @for (task of store.tasks(); track task.id) {
         <li class="flex items-center gap-3 py-2">
           <input
+            #checkbox
             type="checkbox"
             [attr.aria-label]="'Complete ' + task.title"
-            (change)="store.complete(task)"
+            (change)="complete(task, checkbox)"
             class="size-4 cursor-pointer rounded-full"
           />
           <span class="flex-1 text-sm">{{ task.title }}</span>
@@ -29,6 +30,9 @@
               [class]="priorityClasses[task.priority]"
               >P{{ task.priority }}</span
             >
+          }
+          @if (task.recurrenceLabel; as recurrence) {
+            <span class="text-xs text-gray-500" title="Repeats">↻ {{ recurrence }}</span>
           }
           @if (due(task); as label) {
             <span
