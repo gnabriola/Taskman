@@ -31,7 +31,7 @@ describe('TaskStore', () => {
   afterEach(() => http.verify());
 
   it('removes a completed task before the server answers', () => {
-    store.complete(store.tasks()[0]);
+    store.complete(store.tasks()[0]).subscribe();
 
     expect(store.tasks().map((t) => t.id)).toEqual(['t2']);
     http.expectOne('/api/tasks/t1/complete').flush(aTask({ id: 't1', completed: true }));
@@ -39,7 +39,7 @@ describe('TaskStore', () => {
   });
 
   it('restores the task and reports an error when completing fails', () => {
-    store.complete(store.tasks()[0]);
+    store.complete(store.tasks()[0]).subscribe({ error: () => undefined });
 
     http
       .expectOne('/api/tasks/t1/complete')
@@ -47,6 +47,30 @@ describe('TaskStore', () => {
 
     expect(store.tasks().map((t) => t.id)).toEqual(['t1', 't2']);
     expect(store.error()).toBe('Could not complete "A".');
+  });
+
+  it('keeps a completed recurring task and shows its next due date', () => {
+    const recurring = aTask({
+      id: 't1',
+      title: 'A',
+      dueDate: '2026-10-07',
+      recurrence: 'FREQ=DAILY',
+      recurrenceLabel: 'every day',
+    });
+    store.load('p1');
+    http
+      .expectOne('/api/projects/p1/tasks?completed=false')
+      .flush([recurring, aTask({ id: 't2' })]);
+
+    store.complete(recurring).subscribe();
+    expect(store.tasks().map((t) => t.id)).toEqual(['t1', 't2']);
+
+    const req = http.expectOne('/api/tasks/t1/complete');
+    expect(req.request.body).toEqual({ timeZone: 'Europe/Berlin' });
+    req.flush({ ...recurring, dueDate: '2026-10-08' });
+
+    expect(store.tasks()[0].dueDate).toBe('2026-10-08');
+    expect(store.tasks().map((t) => t.id)).toEqual(['t1', 't2']);
   });
 
   it('quick-adds with the current project and time zone and appends the task', () => {

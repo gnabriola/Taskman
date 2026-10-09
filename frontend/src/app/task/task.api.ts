@@ -19,7 +19,11 @@ export class TaskApi {
     return this.http.post<Task>('/api/tasks/quick-add', { text, defaultProjectId, timeZone });
   }
 
-  complete(taskId: string): Observable<Task> {
-    return this.http.post<Task>(`/api/tasks/${taskId}/complete`, null);
+  /**
+   * Completes a task. A recurring task stays open and comes back with its next due date;
+   * the time zone decides what "today" is for that.
+   */
+  complete(taskId: string, timeZone: string): Observable<Task> {
+    return this.http.post<Task>(`/api/tasks/${taskId}/complete`, { timeZone });
   }
 }

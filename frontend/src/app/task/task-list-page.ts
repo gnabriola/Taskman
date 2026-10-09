@@ -10,6 +10,8 @@ import {
   viewChild,
 } from '@angular/core';
 
+import { finalize } from 'rxjs';
+
 import { ProjectStore } from '../project/project.store';
 import { AddTaskForm } from './add-task-form';
 import { DueLabel, dueLabel } from './due-label';
@@ -69,6 +71,14 @@ export class TaskListPage {
       // The store already shows the error; the text stays in the input so it can be fixed.
       error: () => undefined,
     });
+  }
+
+  protected complete(task: Task, checkbox: HTMLInputElement): void {
+    this.store
+      .complete(task)
+      // A recurring task keeps its row (rows are tracked by id), so untick it again.
+      .pipe(finalize(() => (checkbox.checked = false)))
+      .subscribe({ error: () => undefined }); // the store shows the error
   }
 
   protected due(task: Task): DueLabel | null {
