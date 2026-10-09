@@ -12,9 +12,12 @@ import java.util.UUID;
 import com.taskman.label.LabelApi;
 import com.taskman.project.ProjectApi;
 import com.taskman.project.ProjectNotFoundException;
+import com.taskman.task.filter.Filter;
+import com.taskman.task.filter.FilterParser;
 import com.taskman.task.quickadd.ParsedTask;
 import com.taskman.task.quickadd.QuickAddParser;
 
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -31,6 +34,12 @@ class TaskService {
 	private final Clock clock;
 
 	private final QuickAddParser parser = new QuickAddParser();
+
+	private final FilterParser filterParser = new FilterParser();
+
+	/** Soonest first; undated last; all-day before timed; then by priority. */
+	private static final Sort FILTER_ORDER = Sort.by(Sort.Order.asc("dueDate").nullsLast(),
+			Sort.Order.asc("dueTime").nullsFirst(), Sort.Order.asc("priority"), Sort.Order.asc("createdAt"));
 
 	TaskService(TaskRepository tasks, ProjectApi projects, LabelApi labels, Clock clock) {
 		this.tasks = tasks;
@@ -56,6 +65,23 @@ class TaskService {
 			found = tasks.findByProjectIdAndCompletedAtIsNullOrderByCreatedAtAsc(projectId);
 		}
 		return found.stream().map(TaskResponse::from).toList();
+	}
+
+	/**
+	 * Open tasks matching a filter query such as {@code (today | overdue) & #work}.
+	 * @param timeZone the user's zone; decides what "today" and "overdue" mean
+	 */
+	List<TaskResponse> findByFilter(String query, String timeZone) {
+		Filter filter = filterParser.parse(query);
+		ZoneId zone = (timeZone != null) ? ZoneId.of(timeZone) : ZoneOffset.UTC;
+		LocalDateTime now = LocalDateTime.now(clock.withZone(zone));
+		var matching = TaskFilters.matching(filter, now,
+				name -> projects.findIdByName(name).orElseThrow(() -> FilterRejectedException.unknownProject(name)),
+				name -> labels.findIdByName(name).orElseThrow(() -> FilterRejectedException.unknownLabel(name)));
+		return tasks.findAll(matching.and(TaskFilters.open()), FILTER_ORDER)
+			.stream()
+			.map(TaskResponse::from)
+			.toList();
 	}
 
 	TaskResponse findById(UUID id) {

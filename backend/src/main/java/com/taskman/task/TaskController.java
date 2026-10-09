@@ -4,6 +4,7 @@ import java.net.URI;
 import java.util.List;
 import java.util.UUID;
 
+import com.taskman.shared.validation.IanaTimeZone;
 import jakarta.validation.Valid;
 
 import org.springframework.http.ResponseEntity;
@@ -38,6 +39,13 @@ class TaskController {
 	ResponseEntity<TaskResponse> create(@PathVariable UUID projectId, @Valid @RequestBody CreateTaskRequest request) {
 		TaskResponse created = taskService.create(projectId, request);
 		return ResponseEntity.created(taskLocation(created)).body(created);
+	}
+
+	/** Open tasks matching a filter query, e.g. {@code ?filter=today | overdue&timeZone=Europe/Berlin}. */
+	@GetMapping("/tasks")
+	List<TaskResponse> findByFilter(@RequestParam String filter,
+			@RequestParam(required = false) @IanaTimeZone String timeZone) {
+		return taskService.findByFilter(filter, timeZone);
 	}
 
 	@PostMapping("/tasks/quick-add")
