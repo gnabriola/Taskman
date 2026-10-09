@@ -15,6 +15,11 @@ interface TaskRepository extends JpaRepository<Task, UUID> {
 
 	List<Task> findByProjectIdAndCompletedAtIsNotNullOrderByCreatedAtAsc(UUID projectId);
 
+	// task_label is a collection table, not an entity, so this is plain SQL.
+	@Modifying
+	@Query(value = "delete from task_label where label_id = :labelId", nativeQuery = true)
+	void removeLabelFromAllTasks(UUID labelId);
+
 	// One DELETE statement instead of loading every task and deleting them one by one.
 	@Modifying
 	@Query("delete from Task t where t.projectId = :projectId")

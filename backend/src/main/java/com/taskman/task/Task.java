@@ -4,14 +4,21 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.time.temporal.ChronoUnit;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 
 import com.taskman.task.recurrence.Recurrence;
 
+import jakarta.persistence.CollectionTable;
 import jakarta.persistence.Column;
+import jakarta.persistence.ElementCollection;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
+import jakarta.persistence.JoinColumn;
 import jakarta.persistence.Table;
+import org.hibernate.annotations.BatchSize;
 import org.hibernate.annotations.UuidGenerator;
 
 @Entity
@@ -43,6 +50,14 @@ class Task {
 
 	@Column(nullable = false)
 	private boolean recurrenceFromCompletion;
+
+	// Plain label ids, like projectId: the label entity belongs to another module.
+	// BatchSize loads the labels of many tasks in one query instead of one per task.
+	@ElementCollection
+	@CollectionTable(name = "task_label", joinColumns = @JoinColumn(name = "task_id"))
+	@Column(name = "label_id")
+	@BatchSize(size = 50)
+	private Set<UUID> labelIds = new HashSet<>();
 
 	private Instant completedAt;
 
@@ -76,6 +91,8 @@ class Task {
 		this.priority = content.priority();
 		this.recurrence = (content.recurrence() != null) ? content.recurrence().rule() : null;
 		this.recurrenceFromCompletion = content.recurrence() != null && content.recurrence().fromCompletion();
+		this.labelIds.clear();
+		this.labelIds.addAll(content.labelIds());
 	}
 
 	/**
@@ -133,6 +150,11 @@ class Task {
 
 	Recurrence getRecurrence() {
 		return (recurrence != null) ? Recurrence.parse(recurrence, recurrenceFromCompletion) : null;
+	}
+
+	/** Sorted, so responses list labels in a stable order. */
+	List<UUID> getLabelIds() {
+		return labelIds.stream().sorted().toList();
 	}
 
 	Instant getCompletedAt() {
