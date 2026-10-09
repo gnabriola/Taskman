@@ -1,5 +1,8 @@
 package com.taskman.task;
 
+import java.time.LocalDate;
+import java.time.ZoneId;
+
 import com.jayway.jsonpath.JsonPath;
 import com.taskman.DatabaseCleaner;
 import com.taskman.IntegrationTest;
@@ -109,6 +112,91 @@ class TaskApiTests {
 			.isLenientlyEqualTo("""
 					{"dueDate": null, "dueTime": null, "priority": 4}
 					""");
+	}
+
+	@Test
+	void storesRecurrenceAndReturnsALabel() {
+		assertThat(mvc.post()
+			.uri("/api/projects/{projectId}/tasks", projectId)
+			.contentType(MediaType.APPLICATION_JSON)
+			.content("""
+					{"title": "Gym", "dueDate": "2030-01-07", "recurrence": "FREQ=WEEKLY;BYDAY=FR,MO"}
+					""")).hasStatus(HttpStatus.CREATED)
+			.bodyJson()
+			.isLenientlyEqualTo("""
+					{"recurrence": "FREQ=WEEKLY;BYDAY=MO,FR", "recurrenceFromCompletion": false,
+					 "recurrenceLabel": "every Mon, Fri"}
+					""");
+	}
+
+	@Test
+	void rejectsUnsupportedRecurrence() {
+		assertThat(mvc.post()
+			.uri("/api/projects/{projectId}/tasks", projectId)
+			.contentType(MediaType.APPLICATION_JSON)
+			.content("""
+					{"title": "Gym", "dueDate": "2030-01-07", "recurrence": "FREQ=HOURLY"}
+					""")).hasStatus(HttpStatus.BAD_REQUEST)
+			.bodyJson()
+			.extractingPath("$.errors[0].field")
+			.isEqualTo("recurrence");
+	}
+
+	@Test
+	void rejectsRecurrenceWithoutDueDate() {
+		assertThat(mvc.post()
+			.uri("/api/projects/{projectId}/tasks", projectId)
+			.contentType(MediaType.APPLICATION_JSON)
+			.content("""
+					{"title": "Gym", "recurrence": "FREQ=DAILY"}
+					""")).hasStatus(HttpStatus.BAD_REQUEST)
+			.bodyJson()
+			.extractingPath("$.errors[0].field")
+			.isEqualTo("dueDate");
+	}
+
+	@Test
+	void completingRecurringTaskKeepsItOpenWithTheNextDueDate() throws Exception {
+		String id = createRecurring("2030-01-07", "FREQ=WEEKLY;BYDAY=MO,FR");
+
+		assertThat(mvc.post().uri("/api/tasks/{id}/complete", id)).hasStatusOk().bodyJson().isLenientlyEqualTo("""
+				{"completed": false, "completedAt": null, "dueDate": "2030-01-11"}
+				""");
+		assertThat(mvc.get().uri("/api/projects/{projectId}/tasks", projectId).param("completed", "false"))
+			.bodyJson()
+			.extractingPath("$[0].dueDate")
+			.isEqualTo("2030-01-11");
+	}
+
+	@Test
+	void completingOverdueRecurringTaskSkipsToAfterToday() throws Exception {
+		String id = createRecurring("2020-01-01", "FREQ=DAILY");
+		String tomorrow = LocalDate.now(ZoneId.of("Pacific/Kiritimati")).plusDays(1).toString();
+
+		assertThat(mvc.post().uri("/api/tasks/{id}/complete", id).contentType(MediaType.APPLICATION_JSON).content("""
+				{"timeZone": "Pacific/Kiritimati"}
+				""")).hasStatusOk().bodyJson().extractingPath("$.dueDate").isEqualTo(tomorrow);
+	}
+
+	@Test
+	void completeRejectsInvalidTimeZone() throws Exception {
+		String id = createRecurring("2030-01-07", "FREQ=DAILY");
+
+		assertThat(mvc.post().uri("/api/tasks/{id}/complete", id).contentType(MediaType.APPLICATION_JSON).content("""
+				{"timeZone": "Mars/Olympus"}
+				""")).hasStatus(HttpStatus.BAD_REQUEST);
+	}
+
+	@Test
+	void removingRecurrenceMakesTaskCompletable() throws Exception {
+		String id = createRecurring("2030-01-07", "FREQ=DAILY");
+
+		assertThat(mvc.put().uri("/api/tasks/{id}", id).contentType(MediaType.APPLICATION_JSON).content("""
+				{"title": "Task", "projectId": "%s", "dueDate": "2030-01-07"}
+				""".formatted(projectId))).hasStatusOk().bodyJson().extractingPath("$.recurrence").isNull();
+		assertThat(mvc.post().uri("/api/tasks/{id}/complete", id)).bodyJson()
+			.extractingPath("$.completed")
+			.isEqualTo(true);
 	}
 
 	@Test
@@ -241,6 +329,18 @@ class TaskApiTests {
 			.uri("/api/projects/{projectId}/tasks", projectId)
 			.contentType(MediaType.APPLICATION_JSON)
 			.content("{\"title\": \"" + title + "\"}")
+			.exchange();
+		assertThat(result).hasStatus(HttpStatus.CREATED);
+		return idOf(result);
+	}
+
+	private String createRecurring(String dueDate, String rule) throws Exception {
+		MvcTestResult result = mvc.post()
+			.uri("/api/projects/{projectId}/tasks", projectId)
+			.contentType(MediaType.APPLICATION_JSON)
+			.content("""
+					{"title": "Task", "dueDate": "%s", "recurrence": "%s"}
+					""".formatted(dueDate, rule))
 			.exchange();
 		assertThat(result).hasStatus(HttpStatus.CREATED);
 		return idOf(result);

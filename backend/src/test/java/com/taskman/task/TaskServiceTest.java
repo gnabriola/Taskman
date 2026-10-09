@@ -9,9 +9,10 @@ import java.util.UUID;
 
 import com.taskman.project.ProjectApi;
 import com.taskman.project.ProjectNotFoundException;
+import com.taskman.task.recurrence.Recurrence;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -36,8 +37,12 @@ class TaskServiceTest {
 	@Mock
 	private ProjectApi projects;
 
-	@InjectMocks
 	private TaskService taskService;
+
+	@BeforeEach
+	void createService() {
+		taskService = serviceAt("2026-10-07T10:00:00Z");
+	}
 
 	@Test
 	void createRejectsMissingProject() {
@@ -84,8 +89,8 @@ class TaskServiceTest {
 	void completingTwiceKeepsFirstCompletionTime() {
 		given(tasks.findById(TASK_ID)).willReturn(Optional.of(task("Task")));
 
-		TaskResponse first = taskService.complete(TASK_ID);
-		TaskResponse second = taskService.complete(TASK_ID);
+		TaskResponse first = taskService.complete(TASK_ID, null);
+		TaskResponse second = taskService.complete(TASK_ID, null);
 
 		assertThat(first.completedAt()).isNotNull();
 		assertThat(second.completedAt()).isEqualTo(first.completedAt());
@@ -94,7 +99,7 @@ class TaskServiceTest {
 	@Test
 	void reopenClearsCompletion() {
 		Task task = task("Task");
-		task.complete();
+		task.complete(LocalDate.of(2026, 10, 7));
 		given(tasks.findById(TASK_ID)).willReturn(Optional.of(task));
 
 		TaskResponse reopened = taskService.reopen(TASK_ID);
@@ -152,6 +157,29 @@ class TaskServiceTest {
 	}
 
 	@Test
+	void completingRecurringTaskMovesItToTheNextOccurrence() {
+		Task task = new Task(new TaskContent(PROJECT_ID, "Water plants", null, LocalDate.of(2026, 10, 7), null,
+				TaskContent.DEFAULT_PRIORITY, Recurrence.parse("FREQ=DAILY", false)));
+		given(tasks.findById(TASK_ID)).willReturn(Optional.of(task));
+
+		TaskResponse completed = taskService.complete(TASK_ID, "UTC");
+
+		assertThat(completed.completed()).isFalse();
+		assertThat(completed.dueDate()).isEqualTo(LocalDate.of(2026, 10, 8));
+	}
+
+	@Test
+	void completingRecurringTaskUsesTodayInTheUsersTimeZone() {
+		// 23:30 UTC on Oct 7 is already Oct 8 in Berlin, so "every! day" counts from Oct 8
+		TaskService service = serviceAt("2026-10-07T23:30:00Z");
+		Task task = new Task(new TaskContent(PROJECT_ID, "Stretch", null, LocalDate.of(2026, 10, 1), null,
+				TaskContent.DEFAULT_PRIORITY, Recurrence.parse("FREQ=DAILY", true)));
+		given(tasks.findById(TASK_ID)).willReturn(Optional.of(task));
+
+		assertThat(service.complete(TASK_ID, "Europe/Berlin").dueDate()).isEqualTo(LocalDate.of(2026, 10, 9));
+	}
+
+	@Test
 	void missingTaskThrowsNotFound() {
 		given(tasks.findById(TASK_ID)).willReturn(Optional.empty());
 
@@ -163,7 +191,7 @@ class TaskServiceTest {
 	}
 
 	private static Task task(String title) {
-		return new Task(new TaskContent(PROJECT_ID, title, null, null, null, TaskContent.DEFAULT_PRIORITY));
+		return new Task(new TaskContent(PROJECT_ID, title, null, null, null, TaskContent.DEFAULT_PRIORITY, null));
 	}
 
 }

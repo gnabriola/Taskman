@@ -99,6 +99,16 @@ public record Recurrence(Frequency frequency, int interval, Set<DayOfWeek> days,
 		return new Recurrence(frequency, interval, days, monthDay, month, fromCompletion);
 	}
 
+	public static boolean isValid(String rule) {
+		try {
+			parse(rule, false);
+			return true;
+		}
+		catch (InvalidRecurrenceException ex) {
+			return false;
+		}
+	}
+
 	/** The rule in a canonical form: fixed part order, weekdays Monday first, INTERVAL=1 omitted. */
 	public String rule() {
 		List<String> parts = new ArrayList<>();

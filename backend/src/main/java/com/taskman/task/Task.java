@@ -6,6 +6,8 @@ import java.time.LocalTime;
 import java.time.temporal.ChronoUnit;
 import java.util.UUID;
 
+import com.taskman.task.recurrence.Recurrence;
+
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
@@ -35,6 +37,12 @@ class Task {
 
 	@Column(nullable = false)
 	private int priority;
+
+	// Recurrence is a value object spread over two columns; see getRecurrence().
+	private String recurrence;
+
+	@Column(nullable = false)
+	private boolean recurrenceFromCompletion;
 
 	private Instant completedAt;
 
@@ -66,11 +74,23 @@ class Task {
 		this.dueDate = content.dueDate();
 		this.dueTime = content.dueTime();
 		this.priority = content.priority();
+		this.recurrence = (content.recurrence() != null) ? content.recurrence().rule() : null;
+		this.recurrenceFromCompletion = content.recurrence() != null && content.recurrence().fromCompletion();
 	}
 
-	/** Completing an already completed task keeps the original completion time. */
-	void complete() {
-		if (completedAt == null) {
+	/**
+	 * Completes the task. A recurring task stays open and moves to its next
+	 * occurrence instead. Completing an already completed task keeps the original
+	 * completion time.
+	 * @param today the user's current date, needed to skip occurrences already past
+	 */
+	void complete(LocalDate today) {
+		Recurrence rule = getRecurrence();
+		if (rule != null) {
+			dueDate = rule.nextDue(dueDate, today);
+			updatedAt = now();
+		}
+		else if (completedAt == null) {
 			completedAt = now();
 			updatedAt = completedAt;
 		}
@@ -109,6 +129,10 @@ class Task {
 
 	int getPriority() {
 		return priority;
+	}
+
+	Recurrence getRecurrence() {
+		return (recurrence != null) ? Recurrence.parse(recurrence, recurrenceFromCompletion) : null;
 	}
 
 	Instant getCompletedAt() {

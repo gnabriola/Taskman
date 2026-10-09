@@ -57,8 +57,8 @@ class TaskController {
 	}
 
 	@PostMapping("/tasks/{id}/complete")
-	TaskResponse complete(@PathVariable UUID id) {
-		return taskService.complete(id);
+	TaskResponse complete(@PathVariable UUID id, @Valid @RequestBody(required = false) CompleteTaskRequest request) {
+		return taskService.complete(id, (request != null) ? request.timeZone() : null);
 	}
 
 	@PostMapping("/tasks/{id}/reopen")
