@@ -1,3 +1,14 @@
 /* You can add global styles to this file, and also import other style files */
 
 @import 'tailwindcss';
+
+/*
+ * The app has no dark theme yet, so declare the page as light. Without an explicit
+ * background, browsers in dark mode show a dark canvas behind our dark text, and
+ * native controls (checkboxes, inputs) switch to dark styling.
+ */
+html {
+  color-scheme: light;
+  background-color: var(--color-white);
+  color: var(--color-gray-900);
+}
