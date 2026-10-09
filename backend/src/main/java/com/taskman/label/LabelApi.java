@@ -2,6 +2,7 @@ package com.taskman.label;
 
 import java.util.Collection;
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 
@@ -13,6 +14,9 @@ public interface LabelApi {
 
 	/** @throws LabelNotFoundException if any of the ids does not exist */
 	void requireExisting(Set<UUID> labelIds);
+
+	/** Finds a label by name, ignoring case. */
+	Optional<UUID> findIdByName(String name);
 
 	/**
 	 * Ids of the labels with these names (ignoring case), in the same order. Labels

@@ -4,10 +4,11 @@ import java.util.List;
 import java.util.UUID;
 
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 
-interface TaskRepository extends JpaRepository<Task, UUID> {
+interface TaskRepository extends JpaRepository<Task, UUID>, JpaSpecificationExecutor<Task> {
 
 	List<Task> findByProjectIdOrderByCreatedAtAsc(UUID projectId);
 

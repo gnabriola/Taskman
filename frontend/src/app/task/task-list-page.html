@@ -15,37 +15,7 @@
   } @else {
     <ul class="divide-y divide-gray-100">
       @for (task of store.tasks(); track task.id) {
-        <li class="flex items-center gap-3 py-2">
-          <input
-            #checkbox
-            type="checkbox"
-            [attr.aria-label]="'Complete ' + task.title"
-            (change)="complete(task, checkbox)"
-            class="size-4 cursor-pointer rounded-full"
-          />
-          <span class="flex-1 text-sm">{{ task.title }}</span>
-          @if (task.priority < 4) {
-            <span
-              class="rounded px-1.5 text-xs font-semibold"
-              [class]="priorityClasses[task.priority]"
-              >P{{ task.priority }}</span
-            >
-          }
-          @for (name of labels.namesOf(task.labelIds); track name) {
-            <span class="rounded bg-gray-100 px-1.5 text-xs text-gray-600">&#64;{{ name }}</span>
-          }
-          @if (task.recurrenceLabel; as recurrence) {
-            <span class="text-xs text-gray-500" title="Repeats">↻ {{ recurrence }}</span>
-          }
-          @if (due(task); as label) {
-            <span
-              class="text-xs"
-              [class.text-red-600]="label.overdue"
-              [class.text-gray-500]="!label.overdue"
-              >{{ label.text }}</span
-            >
-          }
-        </li>
+        <li appTaskItem [task]="task" [now]="now()"></li>
       } @empty {
         <li class="py-2 text-sm text-gray-500">No open tasks. Nice!</li>
       }

@@ -1,16 +1,27 @@
 import { Component, inject } from '@angular/core';
+import { RouterLink, RouterLinkActive } from '@angular/router';
 
 import { LabelStore } from './label.store';
 
 @Component({
   selector: 'app-label-sidebar',
+  imports: [RouterLink, RouterLinkActive],
   template: `
     <section class="flex flex-col gap-4 p-4" aria-label="Labels">
       <h2 class="px-2 text-xs font-semibold tracking-wide text-gray-500 uppercase">Labels</h2>
 
       <ul class="flex flex-col gap-0.5">
         @for (label of store.labels(); track label.id) {
-          <li class="truncate px-2 py-1.5 text-sm text-gray-700">&#64;{{ label.name }}</li>
+          <li>
+            <a
+              routerLink="/filter"
+              [queryParams]="{ q: '@' + label.name }"
+              routerLinkActive="bg-gray-200 font-medium"
+              [routerLinkActiveOptions]="{ exact: true }"
+              class="block truncate rounded px-2 py-1.5 text-sm hover:bg-gray-100"
+              >&#64;{{ label.name }}</a
+            >
+          </li>
         }
       </ul>
 

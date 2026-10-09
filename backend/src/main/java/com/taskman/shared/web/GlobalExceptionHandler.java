@@ -2,6 +2,7 @@ package com.taskman.shared.web;
 
 import java.util.List;
 
+import com.taskman.shared.BadRequestException;
 import com.taskman.shared.ConflictException;
 import com.taskman.shared.NotFoundException;
 import com.taskman.shared.UnprocessableRequestException;
@@ -29,6 +30,13 @@ class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
 	ProblemDetail handleNotFound(NotFoundException ex) {
 		ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.NOT_FOUND, ex.getMessage());
 		problem.setTitle("Resource not found");
+		return problem;
+	}
+
+	@ExceptionHandler
+	ProblemDetail handleBadRequest(BadRequestException ex) {
+		ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, ex.getMessage());
+		problem.setTitle("Bad Request");
 		return problem;
 	}
 

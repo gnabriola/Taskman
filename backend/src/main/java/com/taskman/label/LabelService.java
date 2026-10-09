@@ -4,6 +4,7 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 
@@ -34,6 +35,11 @@ class LabelService implements LabelApi {
 		if (!missing.isEmpty()) {
 			throw new LabelNotFoundException(missing.iterator().next());
 		}
+	}
+
+	@Override
+	public Optional<UUID> findIdByName(String name) {
+		return labels.findByNameIgnoreCase(name).map(Label::getId);
 	}
 
 	@Override
