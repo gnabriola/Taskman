@@ -3,6 +3,8 @@ package com.taskman.task.quickadd;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
+import java.util.Arrays;
+import java.util.List;
 
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
@@ -107,7 +109,7 @@ class QuickAddParserTest {
 	void parses(String input, String title, LocalDate dueDate, LocalTime dueTime, String project, Integer priority) {
 		ParsedTask parsed = parser.parse(input, NOW);
 
-		assertThat(parsed).isEqualTo(new ParsedTask(title, dueDate, dueTime, project, priority, null));
+		assertThat(parsed).isEqualTo(new ParsedTask(title, dueDate, dueTime, project, priority, null, List.of()));
 	}
 
 	@ParameterizedTest(name = "[{index}] {0}")
@@ -179,6 +181,33 @@ class QuickAddParserTest {
 		assertThat(parsed.recurrence()).isNotNull();
 		assertThat(parsed.projectName()).isEqualTo(project);
 		assertThat(parsed.priority()).isEqualTo(priority);
+	}
+
+	@ParameterizedTest(name = "[{index}] {0}")
+	@CsvSource(delimiter = '|', ignoreLeadingAndTrailingWhitespace = true, textBlock = """
+			# input                                  | title                 | labels (space-separated)
+			buy milk @errands                        | buy milk              | errands
+			@home @urgent fix sink                   | fix sink              | home urgent
+			call @Errands mom                        | call mom              | Errands
+			pay rent tomorrow @home #finance p1      | pay rent              | home
+
+			# The same label twice (ignoring case) is kept once, as first written
+			buy milk @errands @Errands               | buy milk              | errands
+
+			# Not labels: an e-mail address, a lone @, @ followed by a forbidden character
+			email bob@example.com                    | email bob@example.com |
+			meet @ noon                              | meet @ noon           |
+			fix @a#b                                 | fix @a#b              |
+
+			# Nothing left for the title
+			@errands                                 | ''                    | errands
+			""")
+	void parsesLabels(String input, String title, String labels) {
+		ParsedTask parsed = parser.parse(input, NOW);
+
+		List<String> expected = (labels == null) ? List.of() : Arrays.asList(labels.split(" "));
+		assertThat(parsed.title()).isEqualTo(title);
+		assertThat(parsed.labelNames()).isEqualTo(expected);
 	}
 
 }

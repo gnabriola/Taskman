@@ -7,6 +7,7 @@ import java.time.ZoneOffset;
 import java.util.Optional;
 import java.util.UUID;
 
+import com.taskman.label.LabelApi;
 import com.taskman.project.ProjectApi;
 import com.taskman.project.ProjectNotFoundException;
 import com.taskman.task.recurrence.Recurrence;
@@ -36,6 +37,9 @@ class TaskServiceTest {
 
 	@Mock
 	private ProjectApi projects;
+
+	@Mock
+	private LabelApi labels;
 
 	private TaskService taskService;
 
@@ -159,7 +163,7 @@ class TaskServiceTest {
 	@Test
 	void completingRecurringTaskMovesItToTheNextOccurrence() {
 		Task task = new Task(new TaskContent(PROJECT_ID, "Water plants", null, LocalDate.of(2026, 10, 7), null,
-				TaskContent.DEFAULT_PRIORITY, Recurrence.parse("FREQ=DAILY", false)));
+				TaskContent.DEFAULT_PRIORITY, Recurrence.parse("FREQ=DAILY", false), null));
 		given(tasks.findById(TASK_ID)).willReturn(Optional.of(task));
 
 		TaskResponse completed = taskService.complete(TASK_ID, "UTC");
@@ -173,7 +177,7 @@ class TaskServiceTest {
 		// 23:30 UTC on Oct 7 is already Oct 8 in Berlin, so "every! day" counts from Oct 8
 		TaskService service = serviceAt("2026-10-07T23:30:00Z");
 		Task task = new Task(new TaskContent(PROJECT_ID, "Stretch", null, LocalDate.of(2026, 10, 1), null,
-				TaskContent.DEFAULT_PRIORITY, Recurrence.parse("FREQ=DAILY", true)));
+				TaskContent.DEFAULT_PRIORITY, Recurrence.parse("FREQ=DAILY", true), null));
 		given(tasks.findById(TASK_ID)).willReturn(Optional.of(task));
 
 		assertThat(service.complete(TASK_ID, "Europe/Berlin").dueDate()).isEqualTo(LocalDate.of(2026, 10, 9));
@@ -187,11 +191,11 @@ class TaskServiceTest {
 	}
 
 	private TaskService serviceAt(String instant) {
-		return new TaskService(tasks, projects, Clock.fixed(Instant.parse(instant), ZoneOffset.UTC));
+		return new TaskService(tasks, projects, labels, Clock.fixed(Instant.parse(instant), ZoneOffset.UTC));
 	}
 
 	private static Task task(String title) {
-		return new Task(new TaskContent(PROJECT_ID, title, null, null, null, TaskContent.DEFAULT_PRIORITY, null));
+		return new Task(new TaskContent(PROJECT_ID, title, null, null, null, TaskContent.DEFAULT_PRIORITY, null, null));
 	}
 
 }

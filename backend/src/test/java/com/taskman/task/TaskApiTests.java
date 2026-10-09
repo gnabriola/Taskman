@@ -200,6 +200,75 @@ class TaskApiTests {
 	}
 
 	@Test
+	void storesLabels() throws Exception {
+		String errands = createLabel("errands");
+		String urgent = createLabel("urgent");
+
+		MvcTestResult result = mvc.post()
+			.uri("/api/projects/{projectId}/tasks", projectId)
+			.contentType(MediaType.APPLICATION_JSON)
+			.content("""
+					{"title": "Buy milk", "labelIds": ["%s", "%s"]}
+					""".formatted(urgent, errands))
+			.exchange();
+
+		assertThat(result).hasStatus(HttpStatus.CREATED)
+			.bodyJson()
+			.extractingPath("$.labelIds")
+			.asArray()
+			.containsExactlyInAnyOrder(errands, urgent);
+	}
+
+	@Test
+	void rejectsUnknownLabel() {
+		assertThat(mvc.post()
+			.uri("/api/projects/{projectId}/tasks", projectId)
+			.contentType(MediaType.APPLICATION_JSON)
+			.content("""
+					{"title": "Buy milk", "labelIds": ["%s"]}
+					""".formatted(MISSING_ID))).hasStatus(HttpStatus.NOT_FOUND);
+	}
+
+	@Test
+	void updateReplacesLabels() throws Exception {
+		String errands = createLabel("errands");
+		String home = createLabel("home");
+		String id = createTaskWithLabels("Buy milk", errands);
+
+		assertThat(mvc.put().uri("/api/tasks/{id}", id).contentType(MediaType.APPLICATION_JSON).content("""
+				{"title": "Buy milk", "projectId": "%s", "labelIds": ["%s"]}
+				""".formatted(projectId, home))).hasStatusOk()
+			.bodyJson()
+			.extractingPath("$.labelIds")
+			.asArray()
+			.containsExactly(home);
+	}
+
+	@Test
+	void deletingLabelRemovesItFromTasks() throws Exception {
+		String errands = createLabel("errands");
+		String id = createTaskWithLabels("Buy milk", errands);
+
+		assertThat(mvc.delete().uri("/api/labels/{id}", errands)).hasStatus(HttpStatus.NO_CONTENT);
+
+		assertThat(mvc.get().uri("/api/tasks/{id}", id)).hasStatusOk()
+			.bodyJson()
+			.extractingPath("$.labelIds")
+			.asArray()
+			.isEmpty();
+	}
+
+	@Test
+	void deletingProjectAlsoDeletesLabelLinksOfItsTasks() throws Exception {
+		String errands = createLabel("errands");
+		createTaskWithLabels("Buy milk", errands);
+
+		assertThat(mvc.delete().uri("/api/projects/{id}", projectId)).hasStatus(HttpStatus.NO_CONTENT);
+		assertThat(mvc.get().uri("/api/labels")).bodyJson().extractingPath("$[*].name").asArray().containsExactly(
+				"errands");
+	}
+
+	@Test
 	void creatingTaskInMissingProjectReturnsNotFound() {
 		assertThat(mvc.post()
 			.uri("/api/projects/{projectId}/tasks", MISSING_ID)
@@ -341,6 +410,27 @@ class TaskApiTests {
 			.content("""
 					{"title": "Task", "dueDate": "%s", "recurrence": "%s"}
 					""".formatted(dueDate, rule))
+			.exchange();
+		assertThat(result).hasStatus(HttpStatus.CREATED);
+		return idOf(result);
+	}
+
+	private String createLabel(String name) throws Exception {
+		MvcTestResult result = mvc.post()
+			.uri("/api/labels")
+			.contentType(MediaType.APPLICATION_JSON)
+			.content("{\"name\": \"" + name + "\"}")
+			.exchange();
+		assertThat(result).hasStatus(HttpStatus.CREATED);
+		return idOf(result);
+	}
+
+	private String createTaskWithLabels(String title, String... labelIds) throws Exception {
+		String ids = String.join("\", \"", labelIds);
+		MvcTestResult result = mvc.post()
+			.uri("/api/projects/{projectId}/tasks", projectId)
+			.contentType(MediaType.APPLICATION_JSON)
+			.content("{\"title\": \"" + title + "\", \"labelIds\": [\"" + ids + "\"]}")
 			.exchange();
 		assertThat(result).hasStatus(HttpStatus.CREATED);
 		return idOf(result);

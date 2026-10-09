@@ -17,6 +17,7 @@ export interface Task {
   recurrenceFromCompletion: boolean;
   /** Readable form of the recurrence, e.g. "every Monday". */
   recurrenceLabel: string | null;
+  labelIds: string[];
   completed: boolean;
   completedAt: string | null;
   createdAt: string;

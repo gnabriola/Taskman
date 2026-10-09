@@ -31,6 +31,9 @@
               >P{{ task.priority }}</span
             >
           }
+          @for (name of labels.namesOf(task.labelIds); track name) {
+            <span class="rounded bg-gray-100 px-1.5 text-xs text-gray-600">&#64;{{ name }}</span>
+          }
           @if (task.recurrenceLabel; as recurrence) {
             <span class="text-xs text-gray-500" title="Repeats">↻ {{ recurrence }}</span>
           }

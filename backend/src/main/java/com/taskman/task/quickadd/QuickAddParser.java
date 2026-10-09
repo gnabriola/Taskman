@@ -10,6 +10,7 @@ import java.time.format.DateTimeParseException;
 import java.time.temporal.TemporalAdjusters;
 import java.util.ArrayList;
 import java.util.EnumSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -25,7 +26,8 @@ import com.taskman.task.recurrence.Recurrence;
  * Parses Todoist-style quick-add text such as {@code "pay rent tomorrow 5pm #home p1"}.
  * <p>
  * The text is split into words. Walking left to right, small rules try to match a
- * date, a time, a {@code #project} or a priority starting at the current word. Only
+ * date, a time, a recurrence, a {@code #project}, {@code @labels} or a priority
+ * starting at the current word. Only
  * the first date and the first time are used; every word no rule consumed becomes
  * the title. A recurrence ("every monday", "every! 3 days") gives the first due date
  * unless the text also names a date. The behaviour is specified by
@@ -34,6 +36,9 @@ import com.taskman.task.recurrence.Recurrence;
 public class QuickAddParser {
 
 	private static final Pattern PROJECT = Pattern.compile("#(\\S+)");
+
+	/** Same characters as allowed in label names: no whitespace, @ or #. */
+	private static final Pattern LABEL = Pattern.compile("@([^\\s@#]+)");
 
 	private static final Pattern PRIORITY = Pattern.compile("p([1-4])", Pattern.CASE_INSENSITIVE);
 
@@ -100,6 +105,8 @@ public class QuickAddParser {
 		String projectName = null;
 		Integer priority = null;
 		Recurrence recurrence = null;
+		// Keyed by lower case, so "@errands @Errands" yields one label, as first written.
+		Map<String, String> labels = new LinkedHashMap<>();
 
 		for (int i = 0; i < words.size(); i++) {
 			if (consumed[i] || words.get(i).isEmpty()) {
@@ -108,6 +115,12 @@ public class QuickAddParser {
 			Matcher project = PROJECT.matcher(original[i]);
 			if (projectName == null && project.matches()) {
 				projectName = project.group(1);
+				consumed[i] = true;
+				continue;
+			}
+			Matcher label = LABEL.matcher(original[i]);
+			if (label.matches()) {
+				labels.putIfAbsent(label.group(1).toLowerCase(Locale.ROOT), label.group(1));
 				consumed[i] = true;
 				continue;
 			}
@@ -160,7 +173,8 @@ public class QuickAddParser {
 				titleWords.add(original[i]);
 			}
 		}
-		return new ParsedTask(String.join(" ", titleWords), dueDate, dueTime, projectName, priority, recurrence);
+		return new ParsedTask(String.join(" ", titleWords), dueDate, dueTime, projectName, priority, recurrence,
+				List.copyOf(labels.values()));
 	}
 
 	private static <T> Optional<Match<T>> firstMatch(List<Rule<T>> rules, List<String> words, int start,

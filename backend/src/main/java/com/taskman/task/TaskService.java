@@ -6,8 +6,10 @@ import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.time.ZoneOffset;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 
+import com.taskman.label.LabelApi;
 import com.taskman.project.ProjectApi;
 import com.taskman.project.ProjectNotFoundException;
 import com.taskman.task.quickadd.ParsedTask;
@@ -24,13 +26,16 @@ class TaskService {
 
 	private final ProjectApi projects;
 
+	private final LabelApi labels;
+
 	private final Clock clock;
 
 	private final QuickAddParser parser = new QuickAddParser();
 
-	TaskService(TaskRepository tasks, ProjectApi projects, Clock clock) {
+	TaskService(TaskRepository tasks, ProjectApi projects, LabelApi labels, Clock clock) {
 		this.tasks = tasks;
 		this.projects = projects;
+		this.labels = labels;
 		this.clock = clock;
 	}
 
@@ -60,8 +65,10 @@ class TaskService {
 	@Transactional
 	TaskResponse create(UUID projectId, CreateTaskRequest request) {
 		requireProject(projectId);
+		labels.requireExisting(request.labelIdsOrEmpty());
 		TaskContent content = new TaskContent(projectId, request.title().strip(), normalize(request.description()),
-				request.dueDate(), request.dueTime(), priorityOrDefault(request.priority()), request.toRecurrence());
+				request.dueDate(), request.dueTime(), priorityOrDefault(request.priority()), request.toRecurrence(),
+				request.labelIdsOrEmpty());
 		return TaskResponse.from(tasks.save(new Task(content)));
 	}
 
@@ -82,7 +89,8 @@ class TaskService {
 			requireProject(projectId);
 		}
 		TaskContent content = new TaskContent(projectId, parsed.title(), null, parsed.dueDate(), parsed.dueTime(),
-				priorityOrDefault(parsed.priority()), parsed.recurrence());
+				priorityOrDefault(parsed.priority()), parsed.recurrence(),
+				Set.copyOf(labels.findOrCreateByNames(parsed.labelNames())));
 		return TaskResponse.from(tasks.save(new Task(content)));
 	}
 
@@ -92,8 +100,10 @@ class TaskService {
 		if (!task.getProjectId().equals(request.projectId())) {
 			requireProject(request.projectId());
 		}
+		labels.requireExisting(request.labelIdsOrEmpty());
 		task.update(new TaskContent(request.projectId(), request.title().strip(), normalize(request.description()),
-				request.dueDate(), request.dueTime(), priorityOrDefault(request.priority()), request.toRecurrence()));
+				request.dueDate(), request.dueTime(), priorityOrDefault(request.priority()), request.toRecurrence(),
+				request.labelIdsOrEmpty()));
 		return TaskResponse.from(task);
 	}
 

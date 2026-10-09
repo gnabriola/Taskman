@@ -13,6 +13,7 @@ export function aTask(overrides: Partial<Task> = {}): Task {
     recurrence: null,
     recurrenceFromCompletion: false,
     recurrenceLabel: null,
+    labelIds: [],
     completed: false,
     completedAt: null,
     createdAt: '',
