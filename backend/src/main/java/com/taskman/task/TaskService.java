@@ -82,7 +82,7 @@ class TaskService {
 			requireProject(projectId);
 		}
 		TaskContent content = new TaskContent(projectId, parsed.title(), null, parsed.dueDate(), parsed.dueTime(),
-				priorityOrDefault(parsed.priority()), null);
+				priorityOrDefault(parsed.priority()), parsed.recurrence());
 		return TaskResponse.from(tasks.save(new Task(content)));
 	}
 
