@@ -160,7 +160,7 @@ public class QuickAddParser {
 				titleWords.add(original[i]);
 			}
 		}
-		return new ParsedTask(String.join(" ", titleWords), dueDate, dueTime, projectName, priority, recurrence);
+		return new ParsedTask(String.join(" ", titleWords), dueDate, dueTime, projectName, priority, recurrence, List.of());
 	}
 
 	private static <T> Optional<Match<T>> firstMatch(List<Rule<T>> rules, List<String> words, int start,
