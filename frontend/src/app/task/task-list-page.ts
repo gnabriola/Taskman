@@ -10,25 +10,15 @@ import {
   viewChild,
 } from '@angular/core';
 
-import { finalize } from 'rxjs';
-
 import { LabelStore } from '../label/label.store';
 import { ProjectStore } from '../project/project.store';
 import { AddTaskForm } from './add-task-form';
-import { DueLabel, dueLabel } from './due-label';
-import { Priority, Task } from './task.model';
+import { TaskItem } from './task-item';
 import { TaskStore } from './task.store';
-
-const PRIORITY_CLASSES: Record<Priority, string> = {
-  1: 'bg-red-100 text-red-700',
-  2: 'bg-orange-100 text-orange-700',
-  3: 'bg-blue-100 text-blue-700',
-  4: '',
-};
 
 @Component({
   selector: 'app-task-list-page',
-  imports: [AddTaskForm],
+  imports: [AddTaskForm, TaskItem],
   providers: [TaskStore],
   templateUrl: './task-list-page.html',
 })
@@ -37,13 +27,12 @@ export class TaskListPage {
   readonly projectId = input.required<string>();
 
   protected readonly store = inject(TaskStore);
-  protected readonly priorityClasses = PRIORITY_CLASSES;
   private readonly projects = inject(ProjectStore);
-  protected readonly labels = inject(LabelStore);
+  private readonly labels = inject(LabelStore);
   private readonly form = viewChild.required(AddTaskForm);
 
   /** Refreshed every minute so "Today" and overdue markers stay correct. */
-  private readonly now = signal(new Date());
+  protected readonly now = signal(new Date());
 
   protected readonly projectName = computed(
     () => this.projects.projects().find((p) => p.id === this.projectId())?.name ?? '',
@@ -79,17 +68,5 @@ export class TaskListPage {
       // The store already shows the error; the text stays in the input so it can be fixed.
       error: () => undefined,
     });
-  }
-
-  protected complete(task: Task, checkbox: HTMLInputElement): void {
-    this.store
-      .complete(task)
-      // A recurring task keeps its row (rows are tracked by id), so untick it again.
-      .pipe(finalize(() => (checkbox.checked = false)))
-      .subscribe({ error: () => undefined }); // the store shows the error
-  }
-
-  protected due(task: Task): DueLabel | null {
-    return dueLabel(task.dueDate, task.dueTime, this.now());
   }
 }

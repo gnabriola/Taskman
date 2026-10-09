@@ -25,6 +25,18 @@ describe('TaskApi', () => {
     expect(req.request.method).toBe('GET');
   });
 
+  it('requests open tasks matching a filter in the given time zone', () => {
+    api.filter('today | overdue', 'Europe/Berlin').subscribe();
+
+    const req = http.expectOne(
+      (r) =>
+        r.url === '/api/tasks' &&
+        r.params.get('filter') === 'today | overdue' &&
+        r.params.get('timeZone') === 'Europe/Berlin',
+    );
+    expect(req.request.method).toBe('GET');
+  });
+
   it('sends quick-add text with the default project and time zone', () => {
     api.quickAdd('pay rent tomorrow', 'p1', 'Europe/Berlin').subscribe();
 

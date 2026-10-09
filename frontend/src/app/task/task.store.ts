@@ -6,13 +6,19 @@ import { TIME_ZONE } from '../core/time-zone';
 import { TaskApi } from './task.api';
 import { Task } from './task.model';
 
-/** Open tasks of one project. Provided per page, so each page gets its own state. */
+/**
+ * Open tasks of one project, or of a filter query. Provided per page, so each page
+ * gets its own state.
+ */
 @Injectable()
 export class TaskStore {
   private readonly api = inject(TaskApi);
   private readonly timeZone = inject(TIME_ZONE);
 
+  /** Set on a project page; quick-add needs it as the default project. */
   private projectId: string | null = null;
+  /** What is currently shown, e.g. "project:<id>" or "filter:today"; guards against stale responses. */
+  private source: string | null = null;
 
   private readonly _tasks = signal<Task[]>([]);
   private readonly _loading = signal(false);
@@ -25,23 +31,35 @@ export class TaskStore {
   /** Id of the project the last quick-added task went to, if it is not this one. */
   readonly addedToOtherProject = this._addedToOtherProject.asReadonly();
 
+  /** Loads the open tasks of a project. */
   load(projectId: string): void {
     this.projectId = projectId;
+    this.fetch(`project:${projectId}`, this.api.listOpen(projectId));
+  }
+
+  /** Loads the open tasks matching a filter query; syntax errors show the server's message. */
+  loadFilter(query: string): void {
+    this.projectId = null;
+    this.fetch(`filter:${query}`, this.api.filter(query, this.timeZone));
+  }
+
+  private fetch(source: string, request: Observable<Task[]>): void {
+    this.source = source;
     this._tasks.set([]);
     this._loading.set(true);
     this._error.set(null);
     this._addedToOtherProject.set(null);
-    this.api.listOpen(projectId).subscribe({
+    request.subscribe({
       next: (tasks) => {
-        // Ignore a slow response for a project the user has already navigated away from.
-        if (this.projectId === projectId) {
+        // Ignore a slow response for a page the user has already navigated away from.
+        if (this.source === source) {
           this._tasks.set(tasks);
           this._loading.set(false);
         }
       },
-      error: () => {
-        if (this.projectId === projectId) {
-          this._error.set('Could not load tasks.');
+      error: (error: unknown) => {
+        if (this.source === source) {
+          this._error.set(problemDetail(error, 'Could not load tasks.'));
           this._loading.set(false);
         }
       },

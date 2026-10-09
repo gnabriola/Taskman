@@ -14,6 +14,11 @@ export class TaskApi {
     });
   }
 
+  /** Open tasks matching a filter query such as "(today | overdue) & #work". */
+  filter(query: string, timeZone: string): Observable<Task[]> {
+    return this.http.get<Task[]>('/api/tasks', { params: { filter: query, timeZone } });
+  }
+
   /** Creates a task from text like "pay rent tomorrow 5pm #home p1". */
   quickAdd(text: string, defaultProjectId: string, timeZone: string): Observable<Task> {
     return this.http.post<Task>('/api/tasks/quick-add', { text, defaultProjectId, timeZone });

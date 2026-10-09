@@ -109,6 +109,30 @@ describe('TaskStore', () => {
     expect(store.error()).toBe("No project named 'hoem'");
   });
 
+  it('loads filter results and shows syntax errors from the server', () => {
+    store.loadFilter('today &');
+
+    http
+      .expectOne((r) => r.url === '/api/tasks' && r.params.get('filter') === 'today &')
+      .flush(
+        { detail: 'Expected a filter at position 8 but the query ended' },
+        { status: 400, statusText: 'Bad Request' },
+      );
+
+    expect(store.error()).toBe('Expected a filter at position 8 but the query ended');
+    expect(store.loading()).toBe(false);
+  });
+
+  it('ignores a late project response once a filter is shown', () => {
+    store.load('p2');
+    store.loadFilter('today');
+
+    http.expectOne((r) => r.url === '/api/tasks').flush([aTask({ title: 'Filtered' })]);
+    http.expectOne('/api/projects/p2/tasks?completed=false').flush([aTask({ title: 'Stale' })]);
+
+    expect(store.tasks().map((t) => t.title)).toEqual(['Filtered']);
+  });
+
   it('ignores a late response for a project that is no longer shown', () => {
     store.load('p2');
     store.load('p3');

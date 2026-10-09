@@ -6,5 +6,6 @@ export const routes: Routes = [
     path: 'projects/:projectId',
     loadComponent: () => import('./task/task-list-page').then((m) => m.TaskListPage),
   },
+  { path: 'filter', loadComponent: () => import('./task/filter-page').then((m) => m.FilterPage) },
   { path: '**', redirectTo: '' },
 ];
