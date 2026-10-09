@@ -1,5 +1,9 @@
 package com.taskman.task;
 
+import java.time.Clock;
+import java.time.Instant;
+import java.time.LocalDate;
+import java.time.ZoneOffset;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -54,11 +58,12 @@ class TaskServiceTest {
 		assertThat(created.title()).isEqualTo("Pay rent");
 		assertThat(created.description()).isNull();
 		assertThat(created.completed()).isFalse();
+		assertThat(created.priority()).isEqualTo(4);
 	}
 
 	@Test
 	void updateWithinSameProjectDoesNotAskProjectModule() {
-		given(tasks.findById(TASK_ID)).willReturn(Optional.of(new Task(PROJECT_ID, "Old", null)));
+		given(tasks.findById(TASK_ID)).willReturn(Optional.of(task("Old")));
 
 		taskService.update(TASK_ID, new UpdateTaskRequest("New", null, PROJECT_ID));
 
@@ -68,7 +73,7 @@ class TaskServiceTest {
 	@Test
 	void updateRejectsMoveToMissingProject() {
 		UUID otherProject = UUID.randomUUID();
-		given(tasks.findById(TASK_ID)).willReturn(Optional.of(new Task(PROJECT_ID, "Task", null)));
+		given(tasks.findById(TASK_ID)).willReturn(Optional.of(task("Task")));
 		given(projects.exists(otherProject)).willReturn(false);
 
 		assertThatThrownBy(() -> taskService.update(TASK_ID, new UpdateTaskRequest("Task", null, otherProject)))
@@ -77,7 +82,7 @@ class TaskServiceTest {
 
 	@Test
 	void completingTwiceKeepsFirstCompletionTime() {
-		given(tasks.findById(TASK_ID)).willReturn(Optional.of(new Task(PROJECT_ID, "Task", null)));
+		given(tasks.findById(TASK_ID)).willReturn(Optional.of(task("Task")));
 
 		TaskResponse first = taskService.complete(TASK_ID);
 		TaskResponse second = taskService.complete(TASK_ID);
@@ -88,7 +93,7 @@ class TaskServiceTest {
 
 	@Test
 	void reopenClearsCompletion() {
-		Task task = new Task(PROJECT_ID, "Task", null);
+		Task task = task("Task");
 		task.complete();
 		given(tasks.findById(TASK_ID)).willReturn(Optional.of(task));
 
@@ -99,10 +104,66 @@ class TaskServiceTest {
 	}
 
 	@Test
+	void quickAddInterpretsTodayInTheUsersTimeZone() {
+		// 23:30 UTC on Oct 7 is already Oct 8 in Berlin
+		TaskService service = serviceAt("2026-10-07T23:30:00Z");
+		given(projects.exists(PROJECT_ID)).willReturn(true);
+		given(tasks.save(any(Task.class))).willAnswer(invocation -> invocation.getArgument(0));
+
+		TaskResponse created = service.quickAdd(new QuickAddRequest("call mom today p2", PROJECT_ID, "Europe/Berlin"));
+
+		assertThat(created.title()).isEqualTo("call mom");
+		assertThat(created.dueDate()).isEqualTo(LocalDate.of(2026, 10, 8));
+		assertThat(created.priority()).isEqualTo(2);
+		assertThat(created.projectId()).isEqualTo(PROJECT_ID);
+	}
+
+	@Test
+	void quickAddResolvesProjectByName() {
+		UUID work = UUID.randomUUID();
+		TaskService service = serviceAt("2026-10-07T10:00:00Z");
+		given(projects.findIdByName("Work")).willReturn(Optional.of(work));
+		given(tasks.save(any(Task.class))).willAnswer(invocation -> invocation.getArgument(0));
+
+		TaskResponse created = service.quickAdd(new QuickAddRequest("write report #Work", PROJECT_ID, "UTC"));
+
+		assertThat(created.projectId()).isEqualTo(work);
+		verify(projects, never()).exists(any());
+	}
+
+	@Test
+	void quickAddRejectsUnknownProject() {
+		TaskService service = serviceAt("2026-10-07T10:00:00Z");
+		given(projects.findIdByName("hoem")).willReturn(Optional.empty());
+
+		assertThatThrownBy(() -> service.quickAdd(new QuickAddRequest("pay rent #hoem", PROJECT_ID, "UTC")))
+			.isInstanceOf(QuickAddRejectedException.class)
+			.hasMessage("No project named 'hoem'");
+		verify(tasks, never()).save(any());
+	}
+
+	@Test
+	void quickAddRejectsTextWithoutTitle() {
+		TaskService service = serviceAt("2026-10-07T10:00:00Z");
+
+		assertThatThrownBy(() -> service.quickAdd(new QuickAddRequest("tomorrow 5pm p1", PROJECT_ID, "UTC")))
+			.isInstanceOf(QuickAddRejectedException.class);
+		verifyNoInteractions(tasks);
+	}
+
+	@Test
 	void missingTaskThrowsNotFound() {
 		given(tasks.findById(TASK_ID)).willReturn(Optional.empty());
 
 		assertThatThrownBy(() -> taskService.findById(TASK_ID)).isInstanceOf(TaskNotFoundException.class);
+	}
+
+	private TaskService serviceAt(String instant) {
+		return new TaskService(tasks, projects, Clock.fixed(Instant.parse(instant), ZoneOffset.UTC));
+	}
+
+	private static Task task(String title) {
+		return new Task(new TaskContent(PROJECT_ID, title, null, null, null, TaskContent.DEFAULT_PRIORITY));
 	}
 
 }

@@ -14,8 +14,9 @@ export class TaskApi {
     });
   }
 
-  create(projectId: string, title: string): Observable<Task> {
-    return this.http.post<Task>(`/api/projects/${projectId}/tasks`, { title });
+  /** Creates a task from text like "pay rent tomorrow 5pm #home p1". */
+  quickAdd(text: string, defaultProjectId: string, timeZone: string): Observable<Task> {
+    return this.http.post<Task>('/api/tasks/quick-add', { text, defaultProjectId, timeZone });
   }
 
   complete(taskId: string): Observable<Task> {

@@ -1,6 +1,7 @@
 package com.taskman.project;
 
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 import org.springframework.context.ApplicationEventPublisher;
@@ -23,6 +24,11 @@ class ProjectService implements ProjectApi {
 	@Override
 	public boolean exists(UUID projectId) {
 		return projects.existsById(projectId);
+	}
+
+	@Override
+	public Optional<UUID> findIdByName(String name) {
+		return projects.findFirstByNameIgnoreCaseOrderByCreatedAtAsc(name).map(Project::getId);
 	}
 
 	List<ProjectResponse> findAll() {

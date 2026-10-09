@@ -2,6 +2,8 @@ import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
 
+import { TIME_ZONE } from '../core/time-zone';
+import { aTask } from './task.fixtures';
 import { TaskListPage } from './task-list-page';
 
 describe('TaskListPage', () => {
@@ -10,7 +12,11 @@ describe('TaskListPage', () => {
   beforeEach(() => {
     TestBed.configureTestingModule({
       imports: [TaskListPage],
-      providers: [provideHttpClient(), provideHttpClientTesting()],
+      providers: [
+        provideHttpClient(),
+        provideHttpClientTesting(),
+        { provide: TIME_ZONE, useValue: 'UTC' },
+      ],
     });
     http = TestBed.inject(HttpTestingController);
   });
@@ -19,42 +25,59 @@ describe('TaskListPage', () => {
     const fixture = TestBed.createComponent(TaskListPage);
     fixture.componentRef.setInput('projectId', 'p1');
     await fixture.whenStable();
-    http.expectOne('/api/projects/p1/tasks?completed=false').flush([
-      {
-        id: 't1',
-        projectId: 'p1',
-        title: 'Pay rent',
-        description: null,
-        completed: false,
-        completedAt: null,
-        createdAt: '',
-        updatedAt: '',
-      },
-    ]);
+    http
+      .expectOne('/api/projects/p1/tasks?completed=false')
+      .flush([aTask({ id: 't1', title: 'Pay rent', priority: 1 })]);
     await fixture.whenStable();
-    return fixture.nativeElement as HTMLElement;
+    const page = fixture.nativeElement as HTMLElement;
+    const input = page.querySelector<HTMLInputElement>('input[aria-label="New task"]')!;
+    const submit = async (text: string) => {
+      input.value = text;
+      page.querySelector('form')!.dispatchEvent(new Event('submit'));
+      await fixture.whenStable();
+    };
+    return { fixture, page, input, submit };
   }
 
-  it('lists open tasks of the project', async () => {
-    const page = await render();
+  it('lists open tasks with their priority', async () => {
+    const { page } = await render();
 
     expect(page.querySelector('ul')?.textContent).toContain('Pay rent');
+    const badge = [...page.querySelectorAll('li span')].find((s) => s.textContent?.trim() === 'P1');
+    expect(badge?.classList).toContain('bg-red-100');
   });
 
-  it('adds a task from the form', async () => {
-    const page = await render();
-    const input = page.querySelector<HTMLInputElement>('input[aria-label="New task title"]')!;
+  it('quick-adds a task and clears the input on success', async () => {
+    const { fixture, page, input, submit } = await render();
 
-    input.value = '  Buy milk ';
-    page.querySelector('form')!.dispatchEvent(new Event('submit'));
+    await submit('  buy milk tomorrow ');
+    const req = http.expectOne('/api/tasks/quick-add');
+    expect(req.request.body.text).toBe('buy milk tomorrow');
+    req.flush(aTask({ id: 't2', title: 'buy milk' }));
+    await fixture.whenStable();
 
-    const req = http.expectOne('/api/projects/p1/tasks');
-    expect(req.request.body).toEqual({ title: 'Buy milk' });
     expect(input.value).toBe('');
+    expect(page.querySelector('ul')?.textContent).toContain('buy milk');
+  });
+
+  it('keeps the text and shows the reason when quick-add is rejected', async () => {
+    const { fixture, page, input, submit } = await render();
+
+    await submit('pay rent #hoem');
+    http
+      .expectOne('/api/tasks/quick-add')
+      .flush(
+        { detail: "No project named 'hoem'" },
+        { status: 422, statusText: 'Unprocessable Content' },
+      );
+    await fixture.whenStable();
+
+    expect(input.value).toBe('pay rent #hoem');
+    expect(page.querySelector('[role="alert"]')?.textContent).toContain("No project named 'hoem'");
   });
 
   it('completes a task when its checkbox is ticked', async () => {
-    const page = await render();
+    const { page } = await render();
 
     page.querySelector<HTMLInputElement>('input[aria-label="Complete Pay rent"]')!.click();
 

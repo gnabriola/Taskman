@@ -3,6 +3,7 @@ package com.taskman.shared.web;
 import java.util.List;
 
 import com.taskman.shared.NotFoundException;
+import com.taskman.shared.UnprocessableRequestException;
 
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
@@ -27,6 +28,13 @@ class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
 	ProblemDetail handleNotFound(NotFoundException ex) {
 		ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.NOT_FOUND, ex.getMessage());
 		problem.setTitle("Resource not found");
+		return problem;
+	}
+
+	@ExceptionHandler
+	ProblemDetail handleUnprocessable(UnprocessableRequestException ex) {
+		ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.UNPROCESSABLE_CONTENT, ex.getMessage());
+		problem.setTitle("Request cannot be processed");
 		return problem;
 	}
 
