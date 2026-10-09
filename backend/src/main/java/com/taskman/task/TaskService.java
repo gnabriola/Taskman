@@ -6,6 +6,7 @@ import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.time.ZoneOffset;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 
 import com.taskman.label.LabelApi;
@@ -88,7 +89,8 @@ class TaskService {
 			requireProject(projectId);
 		}
 		TaskContent content = new TaskContent(projectId, parsed.title(), null, parsed.dueDate(), parsed.dueTime(),
-				priorityOrDefault(parsed.priority()), parsed.recurrence(), null);
+				priorityOrDefault(parsed.priority()), parsed.recurrence(),
+				Set.copyOf(labels.findOrCreateByNames(parsed.labelNames())));
 		return TaskResponse.from(tasks.save(new Task(content)));
 	}
 

@@ -2,6 +2,7 @@ package com.taskman.task;
 
 import java.time.LocalDate;
 import java.time.ZoneId;
+import java.util.List;
 
 import com.jayway.jsonpath.JsonPath;
 import com.taskman.DatabaseCleaner;
@@ -55,6 +56,26 @@ class QuickAddApiTests {
 					{"title": "pay rent", "recurrence": "FREQ=MONTHLY;BYMONTHDAY=1", "recurrenceFromCompletion": false,
 					 "recurrenceLabel": "every 1st", "priority": 1}
 					""");
+	}
+
+	@Test
+	void attachesLabelsAndCreatesMissingOnes() throws Exception {
+		MvcTestResult existing = mvc.post()
+			.uri("/api/labels")
+			.contentType(MediaType.APPLICATION_JSON)
+			.content("{\"name\": \"errands\"}")
+			.exchange();
+		String errands = JsonPath.read(existing.getResponse().getContentAsString(), "$.id");
+
+		MvcTestResult result = quickAdd("buy milk @Errands @urgent", "UTC");
+
+		assertThat(result).hasStatus(HttpStatus.CREATED).bodyJson().extractingPath("$.title").isEqualTo("buy milk");
+		List<String> labelIds = JsonPath.read(result.getResponse().getContentAsString(), "$.labelIds");
+		assertThat(labelIds).hasSize(2).contains(errands);
+		assertThat(mvc.get().uri("/api/labels")).bodyJson()
+			.extractingPath("$[*].name")
+			.asArray()
+			.containsExactly("errands", "urgent");
 	}
 
 	@Test
