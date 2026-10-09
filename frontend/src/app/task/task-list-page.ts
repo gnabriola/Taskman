@@ -12,6 +12,7 @@ import {
 
 import { finalize } from 'rxjs';
 
+import { LabelStore } from '../label/label.store';
 import { ProjectStore } from '../project/project.store';
 import { AddTaskForm } from './add-task-form';
 import { DueLabel, dueLabel } from './due-label';
@@ -38,6 +39,7 @@ export class TaskListPage {
   protected readonly store = inject(TaskStore);
   protected readonly priorityClasses = PRIORITY_CLASSES;
   private readonly projects = inject(ProjectStore);
+  protected readonly labels = inject(LabelStore);
   private readonly form = viewChild.required(AddTaskForm);
 
   /** Refreshed every minute so "Today" and overdue markers stay correct. */
@@ -67,7 +69,13 @@ export class TaskListPage {
 
   protected add(text: string): void {
     this.store.quickAdd(text).subscribe({
-      next: () => this.form().clear(),
+      next: (task) => {
+        this.form().clear();
+        // Quick-add creates unknown @labels on the server; fetch them to show their names.
+        if (!this.labels.knowsAll(task.labelIds)) {
+          this.labels.load();
+        }
+      },
       // The store already shows the error; the text stays in the input so it can be fixed.
       error: () => undefined,
     });

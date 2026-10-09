@@ -8,7 +8,7 @@ import { Component, ElementRef, output, viewChild } from '@angular/core';
         #textInput
         type="text"
         maxlength="500"
-        placeholder="e.g. pay rent tomorrow 5pm #home p1"
+        placeholder="e.g. pay rent tomorrow 5pm #home @errands p1"
         aria-label="New task"
         class="flex-1 rounded border border-gray-300 px-3 py-2 text-sm focus:border-gray-500 focus:outline-none"
       />

@@ -3,6 +3,7 @@ import { HttpTestingController, provideHttpClientTesting } from '@angular/common
 import { TestBed } from '@angular/core/testing';
 
 import { TIME_ZONE } from '../core/time-zone';
+import { LabelStore } from '../label/label.store';
 import { aTask } from './task.fixtures';
 import { TaskListPage } from './task-list-page';
 
@@ -74,6 +75,36 @@ describe('TaskListPage', () => {
 
     expect(input.value).toBe('pay rent #hoem');
     expect(page.querySelector('[role="alert"]')?.textContent).toContain("No project named 'hoem'");
+  });
+
+  it('shows label names as chips', async () => {
+    TestBed.inject(LabelStore).load();
+    http
+      .expectOne('/api/labels')
+      .flush([{ id: 'l1', name: 'errands', createdAt: '', updatedAt: '' }]);
+    const fixture = TestBed.createComponent(TaskListPage);
+    fixture.componentRef.setInput('projectId', 'p1');
+    await fixture.whenStable();
+    http
+      .expectOne('/api/projects/p1/tasks?completed=false')
+      .flush([aTask({ title: 'Buy milk', labelIds: ['l1'] })]);
+    await fixture.whenStable();
+
+    expect((fixture.nativeElement as HTMLElement).querySelector('ul')?.textContent).toContain(
+      '@errands',
+    );
+  });
+
+  it('reloads labels when quick-add created a new one', async () => {
+    const { fixture, submit } = await render();
+
+    await submit('buy milk @errands');
+    http
+      .expectOne('/api/tasks/quick-add')
+      .flush(aTask({ id: 't2', title: 'buy milk', labelIds: ['new-label'] }));
+    await fixture.whenStable();
+
+    http.expectOne('/api/labels').flush([]);
   });
 
   it('completes a task when its checkbox is ticked', async () => {

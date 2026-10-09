@@ -18,9 +18,12 @@ export class ProjectSidebar {
     if (!name) {
       return;
     }
-    this.store.create(name).subscribe((project) => {
-      input.value = '';
-      this.router.navigate(['/projects', project.id]);
+    this.store.create(name).subscribe({
+      next: (project) => {
+        input.value = '';
+        this.router.navigate(['/projects', project.id]);
+      },
+      error: () => undefined, // the store shows the error
     });
   }
 }
