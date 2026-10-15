@@ -18,6 +18,10 @@ class Label {
 	@UuidGenerator(style = UuidGenerator.Style.VERSION_7)
 	private UUID id;
 
+	// A plain id, not a @ManyToOne: the user entity belongs to another module.
+	@Column(nullable = false, updatable = false)
+	private UUID ownerId;
+
 	@Column(nullable = false, length = 60)
 	private String name;
 
@@ -31,7 +35,8 @@ class Label {
 		// for JPA
 	}
 
-	Label(String name) {
+	Label(UUID ownerId, String name) {
+		this.ownerId = ownerId;
 		this.name = name;
 		this.createdAt = now();
 		this.updatedAt = this.createdAt;

@@ -4,9 +4,11 @@ import java.net.URI;
 import java.util.List;
 import java.util.UUID;
 
+import com.taskman.shared.security.CurrentUser;
 import jakarta.validation.Valid;
 
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -28,13 +30,14 @@ class LabelController {
 	}
 
 	@GetMapping
-	List<LabelResponse> findAll() {
-		return labelService.findAll();
+	List<LabelResponse> findAll(@AuthenticationPrincipal CurrentUser user) {
+		return labelService.findAll(user.id());
 	}
 
 	@PostMapping
-	ResponseEntity<LabelResponse> create(@Valid @RequestBody LabelRequest request) {
-		LabelResponse created = labelService.create(request);
+	ResponseEntity<LabelResponse> create(@AuthenticationPrincipal CurrentUser user,
+			@Valid @RequestBody LabelRequest request) {
+		LabelResponse created = labelService.create(user.id(), request);
 		URI location = ServletUriComponentsBuilder.fromCurrentRequest()
 			.path("/{id}")
 			.buildAndExpand(created.id())
@@ -43,13 +46,14 @@ class LabelController {
 	}
 
 	@PutMapping("/{id}")
-	LabelResponse rename(@PathVariable UUID id, @Valid @RequestBody LabelRequest request) {
-		return labelService.rename(id, request);
+	LabelResponse rename(@AuthenticationPrincipal CurrentUser user, @PathVariable UUID id,
+			@Valid @RequestBody LabelRequest request) {
+		return labelService.rename(user.id(), id, request);
 	}
 
 	@DeleteMapping("/{id}")
-	ResponseEntity<Void> delete(@PathVariable UUID id) {
-		labelService.delete(id);
+	ResponseEntity<Void> delete(@AuthenticationPrincipal CurrentUser user, @PathVariable UUID id) {
+		labelService.delete(user.id(), id);
 		return ResponseEntity.noContent().build();
 	}
 

@@ -4,9 +4,11 @@ import java.net.URI;
 import java.util.List;
 import java.util.UUID;
 
+import com.taskman.shared.security.CurrentUser;
 import jakarta.validation.Valid;
 
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -28,18 +30,19 @@ class ProjectController {
 	}
 
 	@GetMapping
-	List<ProjectResponse> findAll() {
-		return projectService.findAll();
+	List<ProjectResponse> findAll(@AuthenticationPrincipal CurrentUser user) {
+		return projectService.findAll(user.id());
 	}
 
 	@GetMapping("/{id}")
-	ProjectResponse findById(@PathVariable UUID id) {
-		return projectService.findById(id);
+	ProjectResponse findById(@AuthenticationPrincipal CurrentUser user, @PathVariable UUID id) {
+		return projectService.findById(user.id(), id);
 	}
 
 	@PostMapping
-	ResponseEntity<ProjectResponse> create(@Valid @RequestBody ProjectRequest request) {
-		ProjectResponse created = projectService.create(request);
+	ResponseEntity<ProjectResponse> create(@AuthenticationPrincipal CurrentUser user,
+			@Valid @RequestBody ProjectRequest request) {
+		ProjectResponse created = projectService.create(user.id(), request);
 		URI location = ServletUriComponentsBuilder.fromCurrentRequest()
 			.path("/{id}")
 			.buildAndExpand(created.id())
@@ -48,13 +51,14 @@ class ProjectController {
 	}
 
 	@PutMapping("/{id}")
-	ProjectResponse rename(@PathVariable UUID id, @Valid @RequestBody ProjectRequest request) {
-		return projectService.rename(id, request);
+	ProjectResponse rename(@AuthenticationPrincipal CurrentUser user, @PathVariable UUID id,
+			@Valid @RequestBody ProjectRequest request) {
+		return projectService.rename(user.id(), id, request);
 	}
 
 	@DeleteMapping("/{id}")
-	ResponseEntity<Void> delete(@PathVariable UUID id) {
-		projectService.delete(id);
+	ResponseEntity<Void> delete(@AuthenticationPrincipal CurrentUser user, @PathVariable UUID id) {
+		projectService.delete(user.id(), id);
 		return ResponseEntity.noContent().build();
 	}
 

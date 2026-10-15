@@ -29,6 +29,10 @@ class Task {
 	@UuidGenerator(style = UuidGenerator.Style.VERSION_7)
 	private UUID id;
 
+	// Same as the project's owner; stored here so every task query can be scoped by owner.
+	@Column(nullable = false, updatable = false)
+	private UUID ownerId;
+
 	// A plain id, not a @ManyToOne Project: the project entity belongs to another module.
 	@Column(nullable = false)
 	private UUID projectId;
@@ -71,7 +75,8 @@ class Task {
 		// for JPA
 	}
 
-	Task(TaskContent content) {
+	Task(UUID ownerId, TaskContent content) {
+		this.ownerId = ownerId;
 		apply(content);
 		this.createdAt = now();
 		this.updatedAt = this.createdAt;

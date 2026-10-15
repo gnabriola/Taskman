@@ -12,16 +12,16 @@ import java.util.UUID;
  */
 public interface LabelApi {
 
-	/** @throws LabelNotFoundException if any of the ids does not exist */
-	void requireExisting(Set<UUID> labelIds);
+	/** @throws LabelNotFoundException if any id does not exist or is another user's */
+	void requireExisting(UUID ownerId, Set<UUID> labelIds);
 
-	/** Finds a label by name, ignoring case. */
-	Optional<UUID> findIdByName(String name);
+	/** Finds one of the user's labels by name, ignoring case. */
+	Optional<UUID> findIdByName(UUID ownerId, String name);
 
 	/**
-	 * Ids of the labels with these names (ignoring case), in the same order. Labels
-	 * that do not exist yet are created: labels are lightweight tags.
+	 * Ids of the user's labels with these names (ignoring case), in the same order.
+	 * Labels that do not exist yet are created: labels are lightweight tags.
 	 */
-	List<UUID> findOrCreateByNames(Collection<String> names);
+	List<UUID> findOrCreateByNames(UUID ownerId, Collection<String> names);
 
 }

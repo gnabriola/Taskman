@@ -8,13 +8,16 @@ import java.util.UUID;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 
+/** Every query is scoped by owner, so another user's labels are never returned. */
 interface LabelRepository extends JpaRepository<Label, UUID> {
 
-	List<Label> findAllByOrderByNameAsc();
+	List<Label> findAllByOwnerIdOrderByNameAsc(UUID ownerId);
 
-	Optional<Label> findByNameIgnoreCase(String name);
+	Optional<Label> findByIdAndOwnerId(UUID id, UUID ownerId);
 
-	@Query("select l.id from Label l where l.id in :ids")
-	List<UUID> findExistingIds(Collection<UUID> ids);
+	Optional<Label> findByOwnerIdAndNameIgnoreCase(UUID ownerId, String name);
+
+	@Query("select l.id from Label l where l.ownerId = :ownerId and l.id in :ids")
+	List<UUID> findExistingIds(UUID ownerId, Collection<UUID> ids);
 
 }
