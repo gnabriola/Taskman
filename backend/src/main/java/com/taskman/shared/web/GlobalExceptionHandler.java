@@ -12,6 +12,9 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.http.ProblemDetail;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.AccessDeniedException;
+import org.springframework.security.authentication.BadCredentialsException;
+import org.springframework.security.core.AuthenticationException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
@@ -30,6 +33,24 @@ class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
 	ProblemDetail handleNotFound(NotFoundException ex) {
 		ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.NOT_FOUND, ex.getMessage());
 		problem.setTitle("Resource not found");
+		return problem;
+	}
+
+	/** Not logged in (401), or wrong email/password at login. */
+	@ExceptionHandler
+	ProblemDetail handleAuthentication(AuthenticationException ex) {
+		String detail = (ex instanceof BadCredentialsException) ? "Invalid email or password"
+				: "You need to log in";
+		ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.UNAUTHORIZED, detail);
+		problem.setTitle("Unauthorized");
+		return problem;
+	}
+
+	/** Logged in but not allowed, e.g. a missing or invalid CSRF token. */
+	@ExceptionHandler
+	ProblemDetail handleAccessDenied(AccessDeniedException ex) {
+		ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.FORBIDDEN, "Access denied");
+		problem.setTitle("Forbidden");
 		return problem;
 	}
 

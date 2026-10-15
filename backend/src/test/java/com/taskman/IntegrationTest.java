@@ -12,12 +12,13 @@ import org.springframework.context.annotation.Import;
 /**
  * Full application context against a real PostgreSQL in Testcontainers. All tests
  * using this annotation share one cached context, and therefore one container.
+ * Requests are authenticated as the default test user unless a test says otherwise.
  */
 @Target(ElementType.TYPE)
 @Retention(RetentionPolicy.RUNTIME)
 @SpringBootTest
 @AutoConfigureMockMvc
-@Import({ TestcontainersConfiguration.class, DatabaseCleaner.class })
+@Import({ TestcontainersConfiguration.class, DatabaseCleaner.class, AuthenticatedMockMvcConfiguration.class })
 public @interface IntegrationTest {
 
 }
