@@ -18,6 +18,10 @@ class Project {
 	@UuidGenerator(style = UuidGenerator.Style.VERSION_7)
 	private UUID id;
 
+	// A plain id, not a @ManyToOne: the user entity belongs to another module.
+	@Column(nullable = false, updatable = false)
+	private UUID ownerId;
+
 	@Column(nullable = false, length = 120)
 	private String name;
 
@@ -31,7 +35,8 @@ class Project {
 		// for JPA
 	}
 
-	Project(String name) {
+	Project(UUID ownerId, String name) {
+		this.ownerId = ownerId;
 		this.name = name;
 		this.createdAt = now();
 		this.updatedAt = this.createdAt;

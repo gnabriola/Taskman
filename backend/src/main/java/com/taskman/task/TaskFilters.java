@@ -58,6 +58,10 @@ final class TaskFilters {
 		};
 	}
 
+	static Specification<Task> ownedBy(UUID ownerId) {
+		return (root, query, cb) -> cb.equal(root.get("ownerId"), ownerId);
+	}
+
 	static Specification<Task> open() {
 		return (root, query, cb) -> cb.isNull(root.get("completedAt"));
 	}

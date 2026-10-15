@@ -7,6 +7,7 @@ import java.util.UUID;
 import com.jayway.jsonpath.JsonPath;
 import com.taskman.DatabaseCleaner;
 import com.taskman.IntegrationTest;
+import com.taskman.user.TestUsers;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -104,7 +105,7 @@ class LabelApiTests {
 	void findOrCreateReusesExistingLabelsIgnoringCaseAndCreatesMissingOnes() throws Exception {
 		UUID errands = UUID.fromString(idOf(post("errands")));
 
-		List<UUID> ids = labelApi.findOrCreateByNames(List.of("Errands", "urgent"));
+		List<UUID> ids = labelApi.findOrCreateByNames(TestUsers.ID, List.of("Errands", "urgent"));
 
 		assertThat(ids).hasSize(2);
 		assertThat(ids.get(0)).isEqualTo(errands);
@@ -118,8 +119,8 @@ class LabelApiTests {
 	void requireExistingRejectsUnknownIds() throws Exception {
 		UUID errands = UUID.fromString(idOf(post("errands")));
 
-		labelApi.requireExisting(Set.of(errands));
-		assertThatThrownBy(() -> labelApi.requireExisting(Set.of(errands, UUID.fromString(MISSING_ID))))
+		labelApi.requireExisting(TestUsers.ID, Set.of(errands));
+		assertThatThrownBy(() -> labelApi.requireExisting(TestUsers.ID, Set.of(errands, UUID.fromString(MISSING_ID))))
 			.isInstanceOf(LabelNotFoundException.class);
 	}
 

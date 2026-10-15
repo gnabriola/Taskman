@@ -6,10 +6,15 @@ import java.util.UUID;
 
 import org.springframework.data.jpa.repository.JpaRepository;
 
+/** Every query is scoped by owner, so another user's projects are never returned. */
 interface ProjectRepository extends JpaRepository<Project, UUID> {
 
-	List<Project> findAllByOrderByCreatedAtAsc();
+	List<Project> findAllByOwnerIdOrderByCreatedAtAsc(UUID ownerId);
 
-	Optional<Project> findFirstByNameIgnoreCaseOrderByCreatedAtAsc(String name);
+	Optional<Project> findByIdAndOwnerId(UUID id, UUID ownerId);
+
+	boolean existsByIdAndOwnerId(UUID id, UUID ownerId);
+
+	Optional<Project> findFirstByOwnerIdAndNameIgnoreCaseOrderByCreatedAtAsc(UUID ownerId, String name);
 
 }

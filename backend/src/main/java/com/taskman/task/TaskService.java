@@ -52,17 +52,17 @@ class TaskService {
 	 * @param completed {@code true} for completed tasks only, {@code false} for open
 	 * tasks only, {@code null} for all tasks
 	 */
-	List<TaskResponse> findByProject(UUID projectId, Boolean completed) {
-		requireProject(projectId);
+	List<TaskResponse> findByProject(UUID ownerId, UUID projectId, Boolean completed) {
+		requireProject(ownerId, projectId);
 		List<Task> found;
 		if (completed == null) {
-			found = tasks.findByProjectIdOrderByCreatedAtAsc(projectId);
+			found = tasks.findByOwnerIdAndProjectIdOrderByCreatedAtAsc(ownerId, projectId);
 		}
 		else if (completed) {
-			found = tasks.findByProjectIdAndCompletedAtIsNotNullOrderByCreatedAtAsc(projectId);
+			found = tasks.findByOwnerIdAndProjectIdAndCompletedAtIsNotNullOrderByCreatedAtAsc(ownerId, projectId);
 		}
 		else {
-			found = tasks.findByProjectIdAndCompletedAtIsNullOrderByCreatedAtAsc(projectId);
+			found = tasks.findByOwnerIdAndProjectIdAndCompletedAtIsNullOrderByCreatedAtAsc(ownerId, projectId);
 		}
 		return found.stream().map(TaskResponse::from).toList();
 	}
@@ -71,35 +71,37 @@ class TaskService {
 	 * Open tasks matching a filter query such as {@code (today | overdue) & #work}.
 	 * @param timeZone the user's zone; decides what "today" and "overdue" mean
 	 */
-	List<TaskResponse> findByFilter(String query, String timeZone) {
+	List<TaskResponse> findByFilter(UUID ownerId, String query, String timeZone) {
 		Filter filter = filterParser.parse(query);
 		ZoneId zone = (timeZone != null) ? ZoneId.of(timeZone) : ZoneOffset.UTC;
 		LocalDateTime now = LocalDateTime.now(clock.withZone(zone));
 		var matching = TaskFilters.matching(filter, now,
-				name -> projects.findIdByName(name).orElseThrow(() -> FilterRejectedException.unknownProject(name)),
-				name -> labels.findIdByName(name).orElseThrow(() -> FilterRejectedException.unknownLabel(name)));
-		return tasks.findAll(matching.and(TaskFilters.open()), FILTER_ORDER)
+				name -> projects.findIdByName(ownerId, name)
+					.orElseThrow(() -> FilterRejectedException.unknownProject(name)),
+				name -> labels.findIdByName(ownerId, name)
+					.orElseThrow(() -> FilterRejectedException.unknownLabel(name)));
+		return tasks.findAll(TaskFilters.ownedBy(ownerId).and(TaskFilters.open()).and(matching), FILTER_ORDER)
 			.stream()
 			.map(TaskResponse::from)
 			.toList();
 	}
 
-	TaskResponse findById(UUID id) {
-		return TaskResponse.from(load(id));
+	TaskResponse findById(UUID ownerId, UUID id) {
+		return TaskResponse.from(load(ownerId, id));
 	}
 
 	@Transactional
-	TaskResponse create(UUID projectId, CreateTaskRequest request) {
-		requireProject(projectId);
-		labels.requireExisting(request.labelIdsOrEmpty());
+	TaskResponse create(UUID ownerId, UUID projectId, CreateTaskRequest request) {
+		requireProject(ownerId, projectId);
+		labels.requireExisting(ownerId, request.labelIdsOrEmpty());
 		TaskContent content = new TaskContent(projectId, request.title().strip(), normalize(request.description()),
 				request.dueDate(), request.dueTime(), priorityOrDefault(request.priority()), request.toRecurrence(),
 				request.labelIdsOrEmpty());
-		return TaskResponse.from(tasks.save(new Task(content)));
+		return TaskResponse.from(tasks.save(new Task(ownerId, content)));
 	}
 
 	@Transactional
-	TaskResponse quickAdd(QuickAddRequest request) {
+	TaskResponse quickAdd(UUID ownerId, QuickAddRequest request) {
 		LocalDateTime now = LocalDateTime.now(clock.withZone(ZoneId.of(request.timeZone())));
 		ParsedTask parsed = parser.parse(request.text(), now);
 		if (parsed.title().isBlank()) {
@@ -107,26 +109,26 @@ class TaskService {
 		}
 		UUID projectId;
 		if (parsed.projectName() != null) {
-			projectId = projects.findIdByName(parsed.projectName())
+			projectId = projects.findIdByName(ownerId, parsed.projectName())
 				.orElseThrow(() -> QuickAddRejectedException.unknownProject(parsed.projectName()));
 		}
 		else {
 			projectId = request.defaultProjectId();
-			requireProject(projectId);
+			requireProject(ownerId, projectId);
 		}
 		TaskContent content = new TaskContent(projectId, parsed.title(), null, parsed.dueDate(), parsed.dueTime(),
 				priorityOrDefault(parsed.priority()), parsed.recurrence(),
-				Set.copyOf(labels.findOrCreateByNames(parsed.labelNames())));
-		return TaskResponse.from(tasks.save(new Task(content)));
+				Set.copyOf(labels.findOrCreateByNames(ownerId, parsed.labelNames())));
+		return TaskResponse.from(tasks.save(new Task(ownerId, content)));
 	}
 
 	@Transactional
-	TaskResponse update(UUID id, UpdateTaskRequest request) {
-		Task task = load(id);
+	TaskResponse update(UUID ownerId, UUID id, UpdateTaskRequest request) {
+		Task task = load(ownerId, id);
 		if (!task.getProjectId().equals(request.projectId())) {
-			requireProject(request.projectId());
+			requireProject(ownerId, request.projectId());
 		}
-		labels.requireExisting(request.labelIdsOrEmpty());
+		labels.requireExisting(ownerId, request.labelIdsOrEmpty());
 		task.update(new TaskContent(request.projectId(), request.title().strip(), normalize(request.description()),
 				request.dueDate(), request.dueTime(), priorityOrDefault(request.priority()), request.toRecurrence(),
 				request.labelIdsOrEmpty()));
@@ -134,31 +136,32 @@ class TaskService {
 	}
 
 	@Transactional
-	TaskResponse complete(UUID id, String timeZone) {
-		Task task = load(id);
+	TaskResponse complete(UUID ownerId, UUID id, String timeZone) {
+		Task task = load(ownerId, id);
 		ZoneId zone = (timeZone != null) ? ZoneId.of(timeZone) : ZoneOffset.UTC;
 		task.complete(LocalDate.now(clock.withZone(zone)));
 		return TaskResponse.from(task);
 	}
 
 	@Transactional
-	TaskResponse reopen(UUID id) {
-		Task task = load(id);
+	TaskResponse reopen(UUID ownerId, UUID id) {
+		Task task = load(ownerId, id);
 		task.reopen();
 		return TaskResponse.from(task);
 	}
 
 	@Transactional
-	void delete(UUID id) {
-		tasks.delete(load(id));
+	void delete(UUID ownerId, UUID id) {
+		tasks.delete(load(ownerId, id));
 	}
 
-	private Task load(UUID id) {
-		return tasks.findById(id).orElseThrow(() -> new TaskNotFoundException(id));
+	/** Another user's task is reported as not found, so ids cannot be probed. */
+	private Task load(UUID ownerId, UUID id) {
+		return tasks.findByIdAndOwnerId(id, ownerId).orElseThrow(() -> new TaskNotFoundException(id));
 	}
 
-	private void requireProject(UUID projectId) {
-		if (!projects.exists(projectId)) {
+	private void requireProject(UUID ownerId, UUID projectId) {
+		if (!projects.exists(ownerId, projectId)) {
 			throw new ProjectNotFoundException(projectId);
 		}
 	}
